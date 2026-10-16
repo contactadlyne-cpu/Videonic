@@ -206,6 +206,7 @@ fun MainApp(
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
     var videoToDelete by remember { mutableStateOf<VideoItem?>(null) }
     var selectedVideoForAction by remember { mutableStateOf<VideoItem?>(null) }
+    var autoOpenAddVideosForPlaylist by remember { mutableStateOf(false) }
 
     // Intent Sender Launcher for Scoped Storage permissions (Rename/Delete)
     val intentSenderLauncher = rememberLauncherForActivityResult(
@@ -432,6 +433,7 @@ fun MainApp(
                                         BottomNavTab.RECENT -> {
                                             ScreenRecentVideos(
                                                 historyList = recentList,
+                                                sortOrder = sortOrder,
                                                 onPlayHistory = { history ->
                                                     val video = videos.find { it.uri.toString() == history.uriString }
                                                     if (video != null) {
@@ -480,10 +482,7 @@ fun MainApp(
                                             currentScreen = CurrentScreen.PLAYER
                                         },
                                         onRemoveFavorite = { fav ->
-                                            val vid = allVideosList.find { it.uri.toString() == fav.uriString }
-                                            if (vid != null) {
-                                                libraryViewModel.toggleFavorite(vid)
-                                            }
+                                            libraryViewModel.removeFavorite(fav.uriString)
                                         }
                                     )
                                 }
@@ -632,7 +631,11 @@ fun MainApp(
                             playlist = selectedPlaylist!!,
                             items = playlistItems,
                             allVideos = allVideos,
-                            onBackClick = { currentScreen = CurrentScreen.PLAYLISTS },
+                            autoOpenAddVideos = autoOpenAddVideosForPlaylist,
+                            onBackClick = {
+                                autoOpenAddVideosForPlaylist = false
+                                currentScreen = CurrentScreen.PLAYLISTS
+                            },
                             onPlayItem = { item ->
                                 val playlistVideos = playlistItems.mapNotNull { pi -> allVideos.find { it.uri.toString() == pi.videoUriString } }
                                 val vid = allVideos.find { it.uri.toString() == item.videoUriString }
@@ -848,7 +851,11 @@ fun MainApp(
                     onDismiss = { showCreatePlaylistDialog = false },
                     onConfirm = { name ->
                         val initial = selectedVideoForAction?.let { listOf(it) } ?: emptyList()
-                        playlistViewModel.createPlaylist(name, initial)
+                        playlistViewModel.createPlaylist(name, initial) { created ->
+                            playlistViewModel.selectPlaylist(created)
+                            autoOpenAddVideosForPlaylist = initial.isEmpty()
+                            currentScreen = CurrentScreen.PLAYLIST_DETAILS
+                        }
                     }
                 )
             }

@@ -364,46 +364,67 @@ fun setLocked(locked: Boolean) {
 _isLocked.value = locked
 }
 fun selectAudioTrack(trackItem: TrackItem) {
-val currentTracks = exoPlayer.currentTracks
-for (group in currentTracks.groups) {
-if (group.type == C.TRACK_TYPE_AUDIO) {
-for (i in 0 until group.length) {
-val format = group.getTrackFormat(i)
-if (format.id == trackItem.id || format.label == trackItem.name) {
-exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters
-.buildUpon()
-.setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, listOf(i)))
-.build()
-break
-}
-}
-}
-}
+    val currentTracks = exoPlayer.currentTracks
+    var audioGroupIdx = 0
+    for (group in currentTracks.groups) {
+        if (group.type == C.TRACK_TYPE_AUDIO) {
+            for (i in 0 until group.length) {
+                val trackId = "audio_${audioGroupIdx}_$i"
+                val format = group.getTrackFormat(i)
+                if (trackId == trackItem.id ||
+                    (trackItem.groupIndex == audioGroupIdx && trackItem.trackIndex == i) ||
+                    (format.id != null && format.id == trackItem.id) ||
+                    (format.label != null && format.label == trackItem.name)
+                ) {
+                    exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters
+                        .buildUpon()
+                        .setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, listOf(i)))
+                        .build()
+                    break
+                }
+            }
+            audioGroupIdx++
+        }
+    }
+    _audioTracks.value = _audioTracks.value.map {
+        it.copy(isSelected = (it.id == trackItem.id))
+    }
 }
 fun selectSubtitleTrack(trackItem: TrackItem?) {
-if (trackItem == null) {
-exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters
-.buildUpon()
-.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
-.build()
-} else {
-val currentTracks = exoPlayer.currentTracks
-for (group in currentTracks.groups) {
-if (group.type == C.TRACK_TYPE_TEXT) {
-for (i in 0 until group.length) {
-val format = group.getTrackFormat(i)
-if (format.id == trackItem.id || format.label == trackItem.name) {
-exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters
-.buildUpon()
-.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
-.setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, listOf(i)))
-.build()
-break
-}
-}
-}
-}
-}
+    if (trackItem == null) {
+        exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters
+            .buildUpon()
+            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+            .build()
+        _subtitleTracks.value = _subtitleTracks.value.map { it.copy(isSelected = false) }
+    } else {
+        val currentTracks = exoPlayer.currentTracks
+        var subGroupIdx = 0
+        for (group in currentTracks.groups) {
+            if (group.type == C.TRACK_TYPE_TEXT) {
+                for (i in 0 until group.length) {
+                    val trackId = "sub_${subGroupIdx}_$i"
+                    val format = group.getTrackFormat(i)
+                    if (trackId == trackItem.id ||
+                        (trackItem.groupIndex == subGroupIdx && trackItem.trackIndex == i) ||
+                        (format.id != null && format.id == trackItem.id) ||
+                        (format.label != null && format.label == trackItem.name)
+                    ) {
+                        exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters
+                            .buildUpon()
+                            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+                            .setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, listOf(i)))
+                            .build()
+                        break
+                    }
+                }
+                subGroupIdx++
+            }
+        }
+        _subtitleTracks.value = _subtitleTracks.value.map {
+            it.copy(isSelected = (it.id == trackItem.id))
+        }
+    }
 }
 fun setSleepTimer(preset: SleepTimerPreset, customMinutes: Int = 0) {
 sleepTimerJob?.cancel()
@@ -454,39 +475,59 @@ val safeVol = volume.coerceIn(0, max)
 audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, safeVol, 0)
 }
 private fun updateAvailableTracks(tracks: Tracks) {
-val audios = mutableListOf<TrackItem>()
-val subs = mutableListOf<TrackItem>()
-for (group in tracks.groups) {
-if (group.type == C.TRACK_TYPE_AUDIO) {
-for (i in 0 until group.length) {
-val format = group.getTrackFormat(i)
-val name = format.label ?: format.language ?: "Audio Track ${audios.size + 1}"
-audios.add(
-TrackItem(
-id = format.id ?: "$i",
-name = name,
-language = format.language,
-isSelected = group.isTrackSelected(i)
-)
-)
-}
-} else if (group.type == C.TRACK_TYPE_TEXT) {
-for (i in 0 until group.length) {
-val format = group.getTrackFormat(i)
-val name = format.label ?: format.language ?: "Subtitle ${subs.size + 1}"
-subs.add(
-TrackItem(
-id = format.id ?: "$i",
-name = name,
-language = format.language,
-isSelected = group.isTrackSelected(i)
-)
-)
-}
-}
-}
-_audioTracks.value = audios
-_subtitleTracks.value = subs
+    val audios = mutableListOf<TrackItem>()
+    val subs = mutableListOf<TrackItem>()
+    var audioGroupCount = 0
+    var subGroupCount = 0
+    for (group in tracks.groups) {
+        if (group.type == C.TRACK_TYPE_AUDIO) {
+            for (i in 0 until group.length) {
+                val format = group.getTrackFormat(i)
+                val lang = format.language?.uppercase()
+                val label = format.label
+                val name = when {
+                    !label.isNullOrBlank() -> label
+                    !lang.isNullOrBlank() -> "Audio Track ${audios.size + 1} ($lang)"
+                    else -> "Audio Track ${audios.size + 1}"
+                }
+                audios.add(
+                    TrackItem(
+                        id = "audio_${audioGroupCount}_$i",
+                        name = name,
+                        language = format.language ?: "Default",
+                        isSelected = group.isTrackSelected(i),
+                        groupIndex = audioGroupCount,
+                        trackIndex = i
+                    )
+                )
+            }
+            audioGroupCount++
+        } else if (group.type == C.TRACK_TYPE_TEXT) {
+            for (i in 0 until group.length) {
+                val format = group.getTrackFormat(i)
+                val lang = format.language?.uppercase()
+                val label = format.label
+                val name = when {
+                    !label.isNullOrBlank() -> label
+                    !lang.isNullOrBlank() -> "Subtitle ${subs.size + 1} ($lang)"
+                    else -> "Subtitle ${subs.size + 1}"
+                }
+                subs.add(
+                    TrackItem(
+                        id = "sub_${subGroupCount}_$i",
+                        name = name,
+                        language = format.language ?: "Embedded",
+                        isSelected = group.isTrackSelected(i),
+                        groupIndex = subGroupCount,
+                        trackIndex = i
+                    )
+                )
+            }
+            subGroupCount++
+        }
+    }
+    _audioTracks.value = audios
+    _subtitleTracks.value = subs
 }
 private fun startPositionTracker() {
 positionUpdateJob?.cancel()

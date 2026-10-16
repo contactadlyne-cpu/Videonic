@@ -36,10 +36,12 @@ class PlaylistViewModel(application: Application) : AndroidViewModel(application
         _selectedPlaylist.value = playlist
     }
 
-    fun createPlaylist(name: String, initialVideos: List<VideoItem> = emptyList()) {
+    fun createPlaylist(name: String, initialVideos: List<VideoItem> = emptyList(), onCreated: (PlaylistEntity) -> Unit = {}) {
         if (name.isBlank()) return
         viewModelScope.launch {
-            val playlistId = videoDao.insertPlaylist(PlaylistEntity(name = name.trim()))
+            val entity = PlaylistEntity(name = name.trim())
+            val playlistId = videoDao.insertPlaylist(entity)
+            val created = entity.copy(id = playlistId)
             if (initialVideos.isNotEmpty()) {
                 val items = initialVideos.mapIndexed { index, video ->
                     PlaylistItemEntity(
@@ -53,6 +55,8 @@ class PlaylistViewModel(application: Application) : AndroidViewModel(application
                 }
                 videoDao.insertPlaylistItems(items)
             }
+            _selectedPlaylist.value = created
+            onCreated(created)
         }
     }
 

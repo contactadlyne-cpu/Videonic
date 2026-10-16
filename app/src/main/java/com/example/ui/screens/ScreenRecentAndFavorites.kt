@@ -66,11 +66,23 @@ import com.example.ui.theme.VideonicPrimary
 @Composable
 fun ScreenRecentVideos(
     historyList: List<WatchHistoryEntity>,
+    sortOrder: com.example.data.preferences.VideoSortOrder = com.example.data.preferences.VideoSortOrder.DATE_DESC,
     onPlayHistory: (WatchHistoryEntity) -> Unit,
     onDeleteHistoryItem: (String) -> Unit,
     onClearHistory: () -> Unit
 ) {
     var showConfirmClearDialog by remember { mutableStateOf(false) }
+
+    val sortedList = remember(historyList, sortOrder) {
+        when (sortOrder) {
+            com.example.data.preferences.VideoSortOrder.DATE_DESC -> historyList.sortedByDescending { it.lastWatchedTimestamp }
+            com.example.data.preferences.VideoSortOrder.DATE_ASC -> historyList.sortedBy { it.lastWatchedTimestamp }
+            com.example.data.preferences.VideoSortOrder.NAME_ASC -> historyList.sortedBy { it.title.lowercase() }
+            com.example.data.preferences.VideoSortOrder.NAME_DESC -> historyList.sortedByDescending { it.title.lowercase() }
+            com.example.data.preferences.VideoSortOrder.SIZE_DESC -> historyList.sortedByDescending { it.sizeBytes }
+            com.example.data.preferences.VideoSortOrder.DURATION_DESC -> historyList.sortedByDescending { it.durationMs }
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -78,7 +90,7 @@ fun ScreenRecentVideos(
             .testTag("screen_recent_videos")
             .background(MaterialTheme.colorScheme.background)
     ) {
-        if (historyList.isNotEmpty()) {
+        if (sortedList.isNotEmpty()) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -87,7 +99,7 @@ fun ScreenRecentVideos(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "${historyList.size} recently watched",
+                    text = "${sortedList.size} recently watched",
                     style = MaterialTheme.typography.bodyMedium.copy(
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -140,7 +152,7 @@ fun ScreenRecentVideos(
             )
         }
 
-        if (historyList.isEmpty()) {
+        if (sortedList.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -176,7 +188,7 @@ fun ScreenRecentVideos(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
-                items(historyList, key = { it.uriString }) { item ->
+                items(sortedList, key = { it.uriString }) { item ->
                     RecentVideoRow(
                         item = item,
                         onClick = { onPlayHistory(item) },
@@ -238,10 +250,25 @@ fun RecentVideoRow(
                 .padding(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            VideoThumbnail(
-                video = tempVideo,
-                modifier = Modifier.size(width = 90.dp, height = 62.dp)
-            )
+            Box(
+                modifier = Modifier
+                    .size(width = 92.dp, height = 62.dp)
+                    .clip(RoundedCornerShape(8.dp))
+            ) {
+                VideoThumbnail(
+                    video = tempVideo,
+                    modifier = Modifier.fillMaxSize()
+                )
+                LinearProgressIndicator(
+                    progress = { item.progressFraction },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(4.dp)
+                        .align(Alignment.BottomCenter),
+                    color = VideonicPrimary,
+                    trackColor = Color.Black.copy(alpha = 0.35f)
+                )
+            }
 
             Spacer(modifier = Modifier.width(12.dp))
 
@@ -257,23 +284,11 @@ fun RecentVideoRow(
                     overflow = TextOverflow.Ellipsis
                 )
 
-                Spacer(modifier = Modifier.height(4.dp))
-
-                LinearProgressIndicator(
-                    progress = { item.progressFraction },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(4.dp)
-                        .clip(RoundedCornerShape(2.dp)),
-                    color = VideonicPrimary,
-                    trackColor = MaterialTheme.colorScheme.surfaceVariant
-                )
-
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(6.dp))
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = "$progressPercent% • $remainingText",
+                        text = "$progressPercent% watched • $remainingText",
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

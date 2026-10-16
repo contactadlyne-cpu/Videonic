@@ -16,7 +16,9 @@ data class TrackItem(
     val id: String,
     val name: String,
     val language: String?,
-    val isSelected: Boolean
+    val isSelected: Boolean,
+    val groupIndex: Int = 0,
+    val trackIndex: Int = 0
 )
 
 enum class DecoderMode(val label: String, val title: String, val description: String) {

@@ -284,6 +284,7 @@ fun ScreenPlaylistDetails(
     playlist: PlaylistEntity,
     items: List<PlaylistItemEntity>,
     allVideos: List<VideoItem> = emptyList(),
+    autoOpenAddVideos: Boolean = false,
     onBackClick: () -> Unit,
     onPlayItem: (PlaylistItemEntity) -> Unit,
     onPlayAll: () -> Unit,
@@ -293,7 +294,7 @@ fun ScreenPlaylistDetails(
     onDeletePlaylist: () -> Unit
 ) {
     var showMenu by remember { mutableStateOf(false) }
-    var showAddVideosDialog by remember { mutableStateOf(false) }
+    var showAddVideosDialog by remember { mutableStateOf(autoOpenAddVideos) }
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -406,12 +407,38 @@ fun ScreenPlaylistDetails(
                         .padding(32.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = "This playlist is empty. Add videos from the video options menu.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                    )
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            imageVector = Icons.Default.PlaylistAdd,
+                            contentDescription = null,
+                            tint = VideonicPrimary.copy(alpha = 0.6f),
+                            modifier = Modifier.size(64.dp)
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "This playlist is empty",
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "Select videos from your library to add them to this playlist.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(20.dp))
+                        Button(
+                            onClick = { showAddVideosDialog = true },
+                            colors = ButtonDefaults.buttonColors(containerColor = VideonicPrimary),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.testTag("empty_playlist_add_videos_button")
+                        ) {
+                            Icon(imageVector = Icons.Default.Add, contentDescription = null)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Add Videos")
+                        }
+                    }
                 }
             } else {
                 LazyColumn(

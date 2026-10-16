@@ -235,15 +235,24 @@ fun ScreenFolderDetails(
             colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
         )
 
-        ScreenHomeVideos(
-            videos = videos,
-            isLoading = false,
-            viewLayout = viewLayout,
-            sortOrder = sortOrder,
-            onViewLayoutChange = onViewLayoutChange,
-            onVideoClick = onVideoClick,
-            onVideoOptionsClick = onVideoOptionsClick,
-            hasLoadedOnce = true
-        )
+        if (videos.isEmpty() && folder.videoCount > 0) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(color = VideonicPrimary)
+            }
+        } else {
+            ScreenHomeVideos(
+                videos = videos,
+                isLoading = false,
+                viewLayout = viewLayout,
+                sortOrder = sortOrder,
+                onViewLayoutChange = onViewLayoutChange,
+                onVideoClick = onVideoClick,
+                onVideoOptionsClick = onVideoOptionsClick,
+                hasLoadedOnce = true
+            )
+        }
     }
 }

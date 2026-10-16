@@ -277,6 +277,12 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    fun removeFavorite(uriString: String) {
+        viewModelScope.launch {
+            videoDao.removeFavorite(uriString)
+        }
+    }
+
     fun getWatchPosition(uriString: String): Long {
         return watchHistory.value.find { it.uriString == uriString }?.positionMs ?: 0L
     }

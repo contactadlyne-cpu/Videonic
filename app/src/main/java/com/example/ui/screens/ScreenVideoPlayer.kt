@@ -194,6 +194,13 @@ fun ScreenVideoPlayer(
         }
     }
 
+    // Reveal controls when video ends
+    LaunchedEffect(isEnded) {
+        if (isEnded) {
+            areControlsVisible = true
+        }
+    }
+
     // Auto-dismiss gesture HUD
     LaunchedEffect(gestureState.type, gestureState.valueLabel) {
         if (gestureState.type != GestureType.NONE) {
