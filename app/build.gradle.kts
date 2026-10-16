@@ -42,11 +42,7 @@ android {
           ksFile.writeBytes(decoded)
         } catch (_: Exception) {}
       }
-      if (!ksFile.exists() || ksFile.length() == 0L) {
-        try {
-          ProcessBuilder("keytool", "-genkey", "-v", "-keystore", ksFile.absolutePath, "-storepass", "android", "-alias", "androiddebugkey", "-keypass", "android", "-keyalg", "RSA", "-keysize", "2048", "-validity", "10000", "-dname", "CN=Android Debug,O=Android,C=US").start().waitFor()
-        } catch (_: Exception) {}
-      }
+
       storeFile = ksFile
       storePassword = "android"
       keyAlias = "androiddebugkey"
