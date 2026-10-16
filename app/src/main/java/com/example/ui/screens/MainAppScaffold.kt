@@ -72,7 +72,8 @@ import com.example.ui.dialogs.DialogAddToPlaylist
 import com.example.ui.dialogs.DialogRename
 import com.example.ui.dialogs.DialogSleepTimer
 import com.example.ui.dialogs.DialogThemeSelection
-import com.example.ui.sheets.SheetAudioSubtitles
+import com.example.ui.sheets.SheetAudio
+import com.example.ui.sheets.SheetSubtitles
 import com.example.ui.sheets.SheetMoreMenu
 import com.example.ui.sheets.SheetPlayerOptions
 import com.example.ui.sheets.SheetVideoActions
@@ -197,6 +198,7 @@ fun MainApp(
     // Bottom Sheets & Dialogs State
     var showPlayerOptionsSheet by remember { mutableStateOf(false) }
     var showAudioSubSheet by remember { mutableStateOf(false) }
+    var showSubtitleSubSheet by remember { mutableStateOf(false) }
     var audioSubSheetTab by remember { mutableIntStateOf(0) }
     var showVideoInfoSheet by remember { mutableStateOf(false) }
     var showVideoActionsSheet by remember { mutableStateOf(false) }
@@ -619,12 +621,12 @@ fun MainApp(
                         },
                         onOptionsClick = { showPlayerOptionsSheet = true },
                         onAudioClick = {
-                            audioSubSheetTab = 0
                             showAudioSubSheet = true
+                            audioSubSheetTab = 0
                         },
                         onSubtitleClick = {
+                            showSubtitleSubSheet = true
                             audioSubSheetTab = 1
-                            showAudioSubSheet = true
                         },
                         onSpeedClick = { showPlayerOptionsSheet = true },
                         onAspectClick = {
@@ -740,10 +742,16 @@ fun MainApp(
             }
 
             if (showAudioSubSheet) {
-                SheetAudioSubtitles(
+                SheetAudio(
                     playbackManager = playbackManager,
-                    onDismiss = { showAudioSubSheet = false },
-                    initialTab = audioSubSheetTab
+                    onDismiss = { showAudioSubSheet = false }
+                )
+            }
+
+            if (showSubtitleSubSheet) {
+                SheetSubtitles(
+                    playbackManager = playbackManager,
+                    onDismiss = { showSubtitleSubSheet = false }
                 )
             }
 
