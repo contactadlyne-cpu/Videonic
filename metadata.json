@@ -1,0 +1,6 @@
+{
+  "name": "Videonic Lite",
+  "description": "Lightweight, powerful native video player with gesture controls, playlists, and picture-in-picture.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
