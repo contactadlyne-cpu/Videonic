@@ -77,12 +77,8 @@ fun ScreenMe(
     onOpenSettings: () -> Unit,
     onOpenThemeDialog: () -> Unit,
     onOpenAbout: () -> Unit,
-    onOpenReport: () -> Unit,
-    onOpenNetworkStream: () -> Unit = {},
-    onDeleteVideos: (List<VideoItem>) -> Unit = {},
-    onPlayVideo: (VideoItem) -> Unit = {}
+    onOpenReport: () -> Unit
 ) {
-    var showStorageCleanerDialog by remember { mutableStateOf(false) }
     val totalSizeBytes = videos.sumOf { it.sizeBytes }
     val formattedVideoSize = formatBytes(totalSizeBytes)
 
@@ -163,8 +159,7 @@ fun ScreenMe(
                     MeStatColumn(
                         icon = Icons.Default.Storage,
                         value = storageDisplayText,
-                        label = "Storage Used",
-                        onClick = { showStorageCleanerDialog = true }
+                        label = "Storage Used"
                     )
                     MeStatColumn(
                         icon = Icons.Default.Favorite,
@@ -250,37 +245,6 @@ fun ScreenMe(
             }
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
-
-        // Group 3: Tools & Storage
-        MeSectionTitle("Tools & Network")
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(14.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-        ) {
-            Column {
-                MeNavRow(
-                    icon = Icons.Default.Language,
-                    iconTint = VideonicPrimary,
-                    title = "Network Stream",
-                    badge = "Play URL / HLS",
-                    onClick = onOpenNetworkStream
-                )
-                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-                MeNavRow(
-                    icon = Icons.Default.CleaningServices,
-                    iconTint = VideonicPrimary,
-                    title = "Storage Cleaner & Duplicates",
-                    badge = "Analyze & Clean",
-                    onClick = { showStorageCleanerDialog = true }
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(20.dp))
-
         // Group 4: Support & About
         MeSectionTitle("Support & About")
         Card(
@@ -309,20 +273,6 @@ fun ScreenMe(
         }
 
         Spacer(modifier = Modifier.height(28.dp))
-    }
-
-    if (showStorageCleanerDialog) {
-        DialogStorageCleaner(
-            videos = videos,
-            totalDeviceStorageBytes = totalDeviceStorageBytes,
-            onDismiss = { showStorageCleanerDialog = false },
-            onDeleteVideos = { toDelete ->
-                onDeleteVideos(toDelete)
-            },
-            onPlayVideo = { vid ->
-                onPlayVideo(vid)
-            }
-        )
     }
 }
 

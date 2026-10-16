@@ -215,8 +215,8 @@ fun MainApp(
     var showEqualizerDialog by remember { mutableStateOf(false) }
     var showDecoderDialog by remember { mutableStateOf(false) }
     var showQualityDialog by remember { mutableStateOf(false) }
-    var showNetworkStreamDialog by remember { mutableStateOf(false) }
     var showRenameDialog by remember { mutableStateOf(false) }
+
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
     var videoToDelete by remember { mutableStateOf<VideoItem?>(null) }
     var selectedVideoForAction by remember { mutableStateOf<VideoItem?>(null) }
@@ -494,20 +494,11 @@ fun MainApp(
                                                 onOpenSettings = { currentScreen = CurrentScreen.SETTINGS },
                                                 onOpenThemeDialog = { showThemeDialog = true },
                                                 onOpenAbout = { currentScreen = CurrentScreen.ABOUT },
-                                                onOpenReport = { currentScreen = CurrentScreen.REPORT },
-                                                onOpenNetworkStream = { showNetworkStreamDialog = true },
-                                                onDeleteVideos = { toDelete ->
-                                                    toDelete.forEach { libraryViewModel.moveToRecycleBin(it) }
-                                                    Toast.makeText(context, "Moved ${toDelete.size} videos to Recycle Bin", Toast.LENGTH_SHORT).show()
-                                                },
-                                                onPlayVideo = { video ->
-                                                    launchVideoWithResumeCheck(video, allVideosList)
-                                                }
+                                                onOpenReport = { currentScreen = CurrentScreen.REPORT }
                                             )
                                         }
                                     }
                                 }
-
                                 CurrentScreen.FOLDER_DETAILS -> {
                                     val selectedFolder by libraryViewModel.selectedFolder.collectAsState()
                                     val folderVideos by libraryViewModel.folderVideos.collectAsState()
@@ -1006,15 +997,7 @@ fun MainApp(
                 )
             }
 
-            if (showNetworkStreamDialog) {
-                DialogNetworkStream(
-                    onDismiss = { showNetworkStreamDialog = false },
-                    onPlayStream = { url, title ->
-                        playbackManager.playUri(Uri.parse(url), title)
-                        currentScreen = CurrentScreen.PLAYER
-                    }
-                )
-            }
+
         }
     }
 }
