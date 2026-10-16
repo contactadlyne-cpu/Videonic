@@ -20,8 +20,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     val themeMode: StateFlow<ThemeMode> = preferencesManager.themeMode
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ThemeMode.SYSTEM)
 
-    val appColorTheme: StateFlow<com.example.data.preferences.AppColorTheme> = preferencesManager.appColorTheme
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), com.example.data.preferences.AppColorTheme.BLUE)
 
     val viewLayout: StateFlow<ViewLayout> = preferencesManager.viewLayout
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ViewLayout.GRID)
@@ -58,9 +56,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch { preferencesManager.setThemeMode(mode) }
     }
 
-    fun setAppColorTheme(theme: com.example.data.preferences.AppColorTheme) {
-        viewModelScope.launch { preferencesManager.setAppColorTheme(theme) }
-    }
+
 
     fun setViewLayout(layout: ViewLayout) {
         viewModelScope.launch { preferencesManager.setViewLayout(layout) }

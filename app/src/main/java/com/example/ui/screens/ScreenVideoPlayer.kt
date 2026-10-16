@@ -321,16 +321,9 @@ fun ScreenVideoPlayer(
                                 // Direction Lock
                                 if (abs(dy) > abs(dx)) {
                                     // Vertical swipe gesture
-                                    // Left side adjusts Brightness or Volume based on activeLeftControlMode (default Brightness)
-                                    // Right side adjusts Volume
                                     if (downPos.x < size.width * 0.5f) {
-                                        if (activeLeftControlMode == GestureType.VOLUME) {
-                                            dragMode = PlayerDragMode.VOLUME
-                                            startVolume = playbackManager.getCurrentVolume()
-                                        } else {
-                                            dragMode = PlayerDragMode.BRIGHTNESS
-                                            startBrightness = currentBrightness
-                                        }
+                                        dragMode = PlayerDragMode.BRIGHTNESS
+                                        startBrightness = currentBrightness
                                     } else {
                                         dragMode = PlayerDragMode.VOLUME
                                         startVolume = playbackManager.getCurrentVolume()
@@ -439,9 +432,13 @@ fun ScreenVideoPlayer(
                             lastTapTime = 0L
                         } else {
                             // Single tap
-                            lastTapTime = now
-                            lastTapX = downPos.x
-                            areControlsVisible = !areControlsVisible
+                            if (showSpeedDialog) {
+                                showSpeedDialog = false
+                            } else {
+                                lastTapTime = now
+                                lastTapX = downPos.x
+                                areControlsVisible = !areControlsVisible
+                            }
                         }
                     }
 
@@ -531,6 +528,24 @@ fun ScreenVideoPlayer(
             }
         }
 
+        var isDraggingSpeedSlider by remember { mutableStateOf(false) }
+        var speedPopupResetKey by remember { mutableStateOf(0) }
+
+        LaunchedEffect(showSpeedDialog, isDraggingSpeedSlider, speedPopupResetKey) {
+            if (showSpeedDialog && !isDraggingSpeedSlider) {
+                delay(5000)
+                showSpeedDialog = false
+            }
+        }
+
+        LaunchedEffect(gestureState) {
+            if (gestureState.type == GestureType.BRIGHTNESS || gestureState.type == GestureType.VOLUME ||
+                gestureState.type == GestureType.SEEK || gestureState.type == GestureType.ASPECT || gestureState.type == GestureType.SPEED) {
+                delay(1500)
+                gestureState = GestureState(GestureType.NONE)
+            }
+        }
+
         // Small Compact Upper Center Speed Selection Popup
         val availableSpeeds = remember { listOf(0.5f, 1.0f, 2.0f, 4.0f) }
 
@@ -559,7 +574,14 @@ fun ScreenVideoPlayer(
                     }
                     Slider(
                         value = activeSpeed.coerceIn(0.25f, 4.0f),
-                        onValueChange = { playbackManager.setSpeed(it) },
+                        onValueChange = {
+                            isDraggingSpeedSlider = true
+                            playbackManager.setSpeed(it)
+                        },
+                        onValueChangeFinished = {
+                            isDraggingSpeedSlider = false
+                            speedPopupResetKey++
+                        },
                         valueRange = 0.25f..4.0f,
                         modifier = Modifier.fillMaxWidth(),
                         colors = SliderDefaults.colors(
@@ -579,64 +601,59 @@ fun ScreenVideoPlayer(
             }
         }
 
-        // Vertical Swipe Gesture Control on Left Side (Screen Brightness & Volume)
-        val isVerticalGestureActive = gestureState.type == GestureType.BRIGHTNESS || gestureState.type == GestureType.VOLUME
-        val showLeftVerticalControl = (isVerticalGestureActive || areControlsVisible) && !isLocked
-
-        if (showLeftVerticalControl) {
-            val displayType = if (isVerticalGestureActive) gestureState.type else activeLeftControlMode
-            val currentVolume = playbackManager.getCurrentVolume()
-            val maxVolume = playbackManager.getMaxVolume().coerceAtLeast(1)
-            val displayProgress = if (displayType == GestureType.BRIGHTNESS) {
-                currentBrightness
-            } else {
-                currentVolume.toFloat() / maxVolume.toFloat()
-            }
-            val displayLabel = if (displayType == GestureType.BRIGHTNESS) {
-                "${(currentBrightness * 100).toInt()}%"
-            } else {
-                "$currentVolume / $maxVolume"
-            }
-
+        // Left Side Brightness Indicator (Amber/Yellow)
+        val showBrightnessIndicator = gestureState.type == GestureType.BRIGHTNESS && !isLocked
+        if (showBrightnessIndicator) {
             VerticalSwipeGestureControl(
-                type = displayType,
-                progress = displayProgress,
-                valueLabel = displayLabel,
-                isInteractive = isVerticalGestureActive,
-                onModeToggle = {
-                    activeLeftControlMode = if (activeLeftControlMode == GestureType.BRIGHTNESS) {
-                        GestureType.VOLUME
-                    } else {
-                        GestureType.BRIGHTNESS
-                    }
-                },
+                type = GestureType.BRIGHTNESS,
+                progress = currentBrightness,
+                valueLabel = "${(currentBrightness * 100).toInt()}%",
+                isInteractive = true,
+                onModeToggle = {},
                 onProgressChange = { newProgress ->
-                    if (displayType == GestureType.BRIGHTNESS) {
-                        val newBrightness = newProgress.coerceIn(0.01f, 1f)
-                        currentBrightness = newBrightness
-                        activity?.window?.let { win ->
-                            val lp = win.attributes
-                            lp.screenBrightness = newBrightness
-                            win.attributes = lp
-                        }
-                        gestureState = GestureState(
-                            type = GestureType.BRIGHTNESS,
-                            valueLabel = "${(newBrightness * 100).toInt()}%",
-                            progress = newBrightness
-                        )
-                    } else {
-                        val newVol = (newProgress * maxVolume).toInt().coerceIn(0, maxVolume)
-                        playbackManager.setVolume(newVol)
-                        gestureState = GestureState(
-                            type = GestureType.VOLUME,
-                            valueLabel = "$newVol / $maxVolume",
-                            progress = newVol.toFloat() / maxVolume.toFloat().coerceAtLeast(1f)
-                        )
+                    val newBrightness = newProgress.coerceIn(0.01f, 1f)
+                    currentBrightness = newBrightness
+                    activity?.window?.let { win ->
+                        val lp = win.attributes
+                        lp.screenBrightness = newBrightness
+                        win.attributes = lp
                     }
+                    gestureState = GestureState(
+                        type = GestureType.BRIGHTNESS,
+                        valueLabel = "${(newBrightness * 100).toInt()}%",
+                        progress = newBrightness
+                    )
                 },
                 modifier = Modifier
                     .align(Alignment.CenterStart)
                     .padding(start = 20.dp)
+            )
+        }
+
+        // Right Side Volume Indicator (Videonic Blue)
+        val showVolumeIndicator = gestureState.type == GestureType.VOLUME && !isLocked
+        if (showVolumeIndicator) {
+            val currentVolume = playbackManager.getCurrentVolume()
+            val maxVolume = playbackManager.getMaxVolume().coerceAtLeast(1)
+            val volProgress = currentVolume.toFloat() / maxVolume.toFloat()
+            VerticalSwipeGestureControl(
+                type = GestureType.VOLUME,
+                progress = volProgress,
+                valueLabel = "$currentVolume / $maxVolume",
+                isInteractive = true,
+                onModeToggle = {},
+                onProgressChange = { newProgress ->
+                    val newVol = (newProgress * maxVolume).toInt().coerceIn(0, maxVolume)
+                    playbackManager.setVolume(newVol)
+                    gestureState = GestureState(
+                        type = GestureType.VOLUME,
+                        valueLabel = "$newVol / $maxVolume",
+                        progress = newVol.toFloat() / maxVolume.toFloat().coerceAtLeast(1f)
+                    )
+                },
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(end = 20.dp)
             )
         }
 
@@ -840,36 +857,7 @@ fun ScreenVideoPlayer(
                         )
                     }
 
-                    IconButton(
-                        onClick = {
-                            val current = activity?.requestedOrientation ?: ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-                            val next = when (current) {
-                                ActivityInfo.SCREEN_ORIENTATION_PORTRAIT -> ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-                                ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE -> ActivityInfo.SCREEN_ORIENTATION_SENSOR
-                                else -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-                            }
-                            activity?.requestedOrientation = next
-                            
-                            val label = when (next) {
-                                ActivityInfo.SCREEN_ORIENTATION_PORTRAIT -> "Locked Portrait"
-                                ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE -> "Locked Landscape"
-                                else -> "Auto Orientation"
-                            }
-                            gestureState = GestureState(type = GestureType.SPEED, valueLabel = label)
-                        },
-                        modifier = Modifier.testTag("player_fullscreen_button")
-                    ) {
-                        val icon = if (activity?.requestedOrientation == ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE) {
-                            Icons.Default.FullscreenExit
-                        } else {
-                            Icons.Default.Fullscreen
-                        }
-                        Icon(
-                            imageVector = icon,
-                            contentDescription = "Toggle Orientation",
-                            tint = Color.White
-                        )
-                    }
+
                 }
 
                 // Center Playback Controls
@@ -1061,7 +1049,7 @@ fun ScreenVideoPlayer(
                     // Secondary Quick-Action Control Bar
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                        horizontalArrangement = Arrangement.SpaceAround,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         // Lock
@@ -1071,14 +1059,14 @@ fun ScreenVideoPlayer(
                             onClick = { playbackManager.setLocked(true) }
                         )
 
-                        // Speed: Pops up speed dialog first with instant preview and confirmation (Requirement 18 & 19)
+                        // Speed: Toggles speed popup
                         QuickActionButton(
                             icon = Icons.Default.Speed,
-                            label = "${playbackSpeed}x",
-                            onClick = { showSpeedDialog = true }
+                            label = "${String.format(Locale.US, "%.1fx", playbackSpeed)}",
+                            onClick = { showSpeedDialog = !showSpeedDialog }
                         )
 
-                        // Aspect Ratio: Cycles aspect ratio directly with HUD feedback!
+                        // Aspect Ratio (Fit)
                         QuickActionButton(
                             icon = Icons.Default.AspectRatio,
                             label = aspectRatioMode.label,
@@ -1092,19 +1080,26 @@ fun ScreenVideoPlayer(
                             }
                         )
 
-                        // Audio Equalizer (MX Player feature)
+                        // Fullscreen / Orientation Toggle
+                        val isLandscapeMode = activity?.requestedOrientation == ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
                         QuickActionButton(
-                            icon = Icons.Default.Equalizer,
-                            label = "EQ",
-                            onClick = { showEqualizerDialog = true }
-                        )
-
-                        // Video Quality Selector
-                        val qualityTracks by playbackManager.videoQualityTracks.collectAsState()
-                        QuickActionButton(
-                            icon = Icons.Default.Tune,
-                            label = "Quality",
-                            onClick = { showQualityDialog = true }
+                            icon = if (isLandscapeMode) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
+                            label = "Fullscreen",
+                            onClick = {
+                                val current = activity?.requestedOrientation ?: ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                                val next = when (current) {
+                                    ActivityInfo.SCREEN_ORIENTATION_PORTRAIT -> ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                                    ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE -> ActivityInfo.SCREEN_ORIENTATION_SENSOR
+                                    else -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                                }
+                                activity?.requestedOrientation = next
+                                val label = when (next) {
+                                    ActivityInfo.SCREEN_ORIENTATION_PORTRAIT -> "Locked Portrait"
+                                    ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE -> "Locked Landscape"
+                                    else -> "Auto Orientation"
+                                }
+                                gestureState = GestureState(type = GestureType.SPEED, valueLabel = label)
+                            }
                         )
                     }
                 }

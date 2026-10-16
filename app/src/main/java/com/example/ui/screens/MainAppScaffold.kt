@@ -129,7 +129,6 @@ fun MainApp(
     val settingsViewModel: SettingsViewModel = viewModel()
 
     val themeMode by settingsViewModel.themeMode.collectAsState()
-    val appColorTheme by settingsViewModel.appColorTheme.collectAsState()
     val isSystemDark = isSystemInDarkTheme()
     val isDarkTheme = when (themeMode) {
         ThemeMode.LIGHT -> false
@@ -277,7 +276,7 @@ fun MainApp(
         }
     }
 
-    VideonicLiteTheme(darkTheme = isDarkTheme, appColorTheme = appColorTheme) {
+    VideonicLiteTheme(darkTheme = isDarkTheme) {
         Box(modifier = Modifier.fillMaxSize()) {
             when (currentScreen) {
                 CurrentScreen.SPLASH -> {
@@ -976,11 +975,9 @@ fun MainApp(
             if (showThemeDialog) {
                 DialogThemeSelection(
                     currentTheme = themeMode,
-                    currentColorTheme = appColorTheme,
                     onDismiss = { showThemeDialog = false },
-                    onSelectTheme = { mode, color ->
+                    onSelectTheme = { mode ->
                         settingsViewModel.setThemeMode(mode)
-                        settingsViewModel.setAppColorTheme(color)
                     }
                 )
             }

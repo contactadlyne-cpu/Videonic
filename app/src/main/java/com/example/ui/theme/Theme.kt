@@ -8,7 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
 private val DarkColorScheme = darkColorScheme(
-    primary = VideonicPrimaryDark,
+    primary = VideonicPrimary,
     onPrimary = Color.White,
     primaryContainer = Color(0xFF1E3A8A),
     onPrimaryContainer = Color(0xFFDBEAFE),
@@ -44,21 +44,9 @@ private val LightColorScheme = lightColorScheme(
 @Composable
 fun VideonicLiteTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    appColorTheme: com.example.data.preferences.AppColorTheme = com.example.data.preferences.AppColorTheme.BLUE,
     content: @Composable () -> Unit
 ) {
-    val primaryColor = Color(appColorTheme.primaryColorHex)
-    val colorScheme = if (darkTheme) {
-        DarkColorScheme.copy(
-            primary = primaryColor,
-            secondary = primaryColor.copy(alpha = 0.8f)
-        )
-    } else {
-        LightColorScheme.copy(
-            primary = primaryColor,
-            secondary = primaryColor.copy(alpha = 0.85f)
-        )
-    }
+    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
 
     MaterialTheme(
         colorScheme = colorScheme,

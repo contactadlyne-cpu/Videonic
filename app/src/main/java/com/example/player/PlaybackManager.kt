@@ -462,27 +462,42 @@ _isLocked.value = locked
 fun selectAudioTrack(trackItem: TrackItem) {
     val currentTracks = exoPlayer.currentTracks
     var audioGroupIdx = 0
+    var applied = false
+    val builder = exoPlayer.trackSelectionParameters.buildUpon()
+        .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, false)
+
     for (group in currentTracks.groups) {
         if (group.type == C.TRACK_TYPE_AUDIO) {
-            for (i in 0 until group.length) {
-                val trackId = "audio_${audioGroupIdx}_$i"
-                val format = group.getTrackFormat(i)
-                if (trackId == trackItem.id ||
-                    (trackItem.groupIndex == audioGroupIdx && trackItem.trackIndex == i) ||
-                    (format.id != null && format.id == trackItem.id) ||
-                    (format.label != null && format.label == trackItem.name)
-                ) {
-                    exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters
-                        .buildUpon()
-                        .setPreferredAudioLanguage(trackItem.language)
-                        .setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, listOf(i)))
-                        .build()
-                    break
-                }
+            if (trackItem.groupIndex == audioGroupIdx) {
+                val indices = listOf(trackItem.trackIndex)
+                builder.setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, indices))
+                applied = true
+                break
             }
             audioGroupIdx++
         }
     }
+
+    if (!applied) {
+        audioGroupIdx = 0
+        for (group in currentTracks.groups) {
+            if (group.type == C.TRACK_TYPE_AUDIO) {
+                for (i in 0 until group.length) {
+                    val trackId = "audio_${audioGroupIdx}_$i"
+                    if (trackId == trackItem.id || (trackItem.groupIndex == audioGroupIdx && trackItem.trackIndex == i)) {
+                        builder.setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, listOf(i)))
+                        applied = true
+                        break
+                    }
+                }
+                if (applied) break
+                audioGroupIdx++
+            }
+        }
+    }
+
+    exoPlayer.trackSelectionParameters = builder.build()
+
     _audioTracks.value = _audioTracks.value.map {
         it.copy(isSelected = (it.id == trackItem.id))
     }
