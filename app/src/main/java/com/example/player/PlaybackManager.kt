@@ -9,9 +9,11 @@ import androidx.core.app.NotificationCompat
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaStyleNotificationHelper
 import android.content.Context
+import android.content.pm.PackageManager
 import android.media.AudioManager
 import android.net.Uri
 import androidx.annotation.OptIn
+import androidx.core.content.ContextCompat
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -659,6 +661,11 @@ fun updateMediaNotification() {
     }
 
     try {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            // Permission not granted, cannot post notification. Skip to avoid Lint error/Crash.
+            return
+        }
         notificationManager.notify(2002, builder.build())
     } catch (e: Exception) {
         e.printStackTrace()
