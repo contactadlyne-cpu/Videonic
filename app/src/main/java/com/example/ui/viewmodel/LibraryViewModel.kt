@@ -69,15 +69,25 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     val recycleBinItems: StateFlow<List<RecycleBinEntity>> = videoDao.getRecycleBinItems()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val privateVideos: StateFlow<List<com.example.data.local.entities.PrivateVideoEntity>> = videoDao.getPrivateVideos()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val privateFolderPin: StateFlow<String?> = preferencesManager.privateFolderPin
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
     val filteredVideos: StateFlow<List<VideoItem>> = combine(
         _rawVideos,
         _searchQuery,
-        sortOrder
-    ) { videos, query, sort ->
+        sortOrder,
+        privateVideos
+    ) { videos, query, sort, privates ->
+        val privateUriSet = privates.map { it.uriString }.toSet()
+        val nonPrivateVideos = videos.filter { it.uri.toString() !in privateUriSet }
+
         val filtered = if (query.isBlank()) {
-            videos
+            nonPrivateVideos
         } else {
-            videos.filter {
+            nonPrivateVideos.filter {
                 it.displayName.contains(query, ignoreCase = true) ||
                 it.title.contains(query, ignoreCase = true) ||
                 it.folderName.contains(query, ignoreCase = true)
@@ -94,7 +104,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val folders: StateFlow<List<FolderItem>> = _rawVideos.combine(_searchQuery) { videos, _ ->
+    val folders: StateFlow<List<FolderItem>> = combine(filteredVideos, _searchQuery) { videos, _ ->
         mediaRepository.groupVideosByFolder(videos)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -340,5 +350,49 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
 
     fun clearVideoInfo() {
         _videoInfo.value = null
+    }
+
+    // --- Private Folder Management ---
+    fun setPrivateFolderPin(pin: String?) {
+        viewModelScope.launch {
+            preferencesManager.setPrivateFolderPin(pin)
+        }
+    }
+
+    fun moveToPrivateFolder(video: VideoItem) {
+        viewModelScope.launch {
+            videoDao.insertPrivateVideo(
+                com.example.data.local.entities.PrivateVideoEntity(
+                    uriString = video.uri.toString(),
+                    title = video.displayName,
+                    durationMs = video.durationMs,
+                    sizeBytes = video.sizeBytes,
+                    dateAdded = System.currentTimeMillis(),
+                    mimeType = video.mimeType,
+                    width = video.width,
+                    height = video.height
+                )
+            )
+            // Immediately remove from gallery memory
+            _rawVideos.value = _rawVideos.value.filter { it.uri.toString() != video.uri.toString() }
+        }
+    }
+
+    fun restoreFromPrivateFolder(privateVideo: com.example.data.local.entities.PrivateVideoEntity) {
+        viewModelScope.launch {
+            videoDao.removePrivateVideo(privateVideo.uriString)
+            loadVideos()
+        }
+    }
+
+    fun deletePrivateVideoPermanently(privateVideo: com.example.data.local.entities.PrivateVideoEntity) {
+        viewModelScope.launch {
+            videoDao.removePrivateVideo(privateVideo.uriString)
+            try {
+                getApplication<Application>().contentResolver.delete(Uri.parse(privateVideo.uriString), null, null)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
     }
 }

@@ -17,11 +17,13 @@ import androidx.core.content.ContextCompat
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import com.example.data.model.VideoItem
@@ -38,24 +40,42 @@ import kotlinx.coroutines.launch
 
 @OptIn(UnstableApi::class)
 class PlaybackManager(private val context: Context) {
-private var mediaSession: MediaSession? = null
-private val _isBackgroundAudioEnabled = MutableStateFlow(false)
-val isBackgroundAudioEnabled: StateFlow<Boolean> = _isBackgroundAudioEnabled.asStateFlow()
-private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-private val scope = CoroutineScope(Dispatchers.Main + Job())
-val equalizerController = EqualizerController()
-val exoPlayer: ExoPlayer = ExoPlayer.Builder(context)
-.setAudioAttributes(
-AudioAttributes.Builder()
-.setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
-.setUsage(C.USAGE_MEDIA)
-.build(),
-true
-)
-.setHandleAudioBecomingNoisy(true)
-.setSeekBackIncrementMs(10000)
-.setSeekForwardIncrementMs(10000)
-.build()
+    private var mediaSession: MediaSession? = null
+    private val _isBackgroundAudioEnabled = MutableStateFlow(false)
+    val isBackgroundAudioEnabled: StateFlow<Boolean> = _isBackgroundAudioEnabled.asStateFlow()
+    private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+    private val scope = CoroutineScope(Dispatchers.Main + Job())
+    val equalizerController = EqualizerController()
+
+    val exoPlayer: ExoPlayer = run {
+        val renderersFactory = DefaultRenderersFactory(context)
+            .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
+            .setEnableDecoderFallback(true)
+
+        val loadControl = DefaultLoadControl.Builder()
+            .setBufferDurationsMs(
+                15_000, // minBufferMs
+                50_000, // maxBufferMs
+                1_500,  // bufferForPlaybackMs
+                3_000   // bufferForPlaybackAfterRebufferMs
+            )
+            .setPrioritizeTimeOverSizeThresholds(true)
+            .build()
+
+        ExoPlayer.Builder(context, renderersFactory)
+            .setLoadControl(loadControl)
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
+                    .setUsage(C.USAGE_MEDIA)
+                    .build(),
+                true
+            )
+            .setHandleAudioBecomingNoisy(true)
+            .setSeekBackIncrementMs(10000)
+            .setSeekForwardIncrementMs(10000)
+            .build()
+    }
 private val _currentVideo = MutableStateFlow<VideoItem?>(null)
 val currentVideo: StateFlow<VideoItem?> = _currentVideo.asStateFlow()
 private val _isPlaying = MutableStateFlow(false)
@@ -80,6 +100,8 @@ private val _audioTracks = MutableStateFlow<List<TrackItem>>(emptyList())
 val audioTracks: StateFlow<List<TrackItem>> = _audioTracks.asStateFlow()
 private val _subtitleTracks = MutableStateFlow<List<TrackItem>>(emptyList())
 val subtitleTracks: StateFlow<List<TrackItem>> = _subtitleTracks.asStateFlow()
+private val _videoQualityTracks = MutableStateFlow<List<TrackItem>>(emptyList())
+val videoQualityTracks: StateFlow<List<TrackItem>> = _videoQualityTracks.asStateFlow()
 private val _sleepTimerSeconds = MutableStateFlow(0)
 val sleepTimerSeconds: StateFlow<Int> = _sleepTimerSeconds.asStateFlow()
 private val _autoPlayNext = MutableStateFlow(true)
@@ -89,6 +111,78 @@ val isSpeedBoostActive: StateFlow<Boolean> = _isSpeedBoostActive.asStateFlow()
 // Holds position if video was auto-resumed so UI can show "Start from Beginning"
 private val _autoResumedFromMs = MutableStateFlow<Long?>(null)
 val autoResumedFromMs: StateFlow<Long?> = _autoResumedFromMs.asStateFlow()
+
+// Video Mirror Mode (Horizontal Flip)
+private val _isMirrored = MutableStateFlow(false)
+val isMirrored: StateFlow<Boolean> = _isMirrored.asStateFlow()
+
+// A-B Repeat Mode
+private val _repeatPointA = MutableStateFlow<Long?>(null)
+val repeatPointA: StateFlow<Long?> = _repeatPointA.asStateFlow()
+
+private val _repeatPointB = MutableStateFlow<Long?>(null)
+val repeatPointB: StateFlow<Long?> = _repeatPointB.asStateFlow()
+
+private val _isAbRepeatActive = MutableStateFlow(false)
+val isAbRepeatActive: StateFlow<Boolean> = _isAbRepeatActive.asStateFlow()
+
+fun toggleMirror(): Boolean {
+    val next = !_isMirrored.value
+    _isMirrored.value = next
+    return next
+}
+
+fun setRepeatPointA() {
+    val pos = exoPlayer.currentPosition.coerceAtLeast(0L)
+    _repeatPointA.value = pos
+    _repeatPointB.value = null
+    _isAbRepeatActive.value = false
+}
+
+fun setRepeatPointB() {
+    val pos = exoPlayer.currentPosition.coerceAtLeast(0L)
+    val a = _repeatPointA.value ?: 0L
+    if (pos > a) {
+        _repeatPointB.value = pos
+    } else {
+        _repeatPointB.value = a + 5000L
+    }
+    _isAbRepeatActive.value = true
+}
+
+fun clearAbRepeat() {
+    _repeatPointA.value = null
+    _repeatPointB.value = null
+    _isAbRepeatActive.value = false
+}
+
+fun loadExternalSubtitle(uri: Uri, label: String = "External Subtitle") {
+    try {
+        val mime = if (uri.toString().endsWith(".vtt", ignoreCase = true)) MimeTypes.TEXT_VTT else MimeTypes.APPLICATION_SUBRIP
+        val subtitleConfig = MediaItem.SubtitleConfiguration.Builder(uri)
+            .setMimeType(mime)
+            .setLabel(label)
+            .setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
+            .build()
+
+        val curVideo = _currentVideo.value ?: return
+        val currentPos = exoPlayer.currentPosition
+        val wasPlaying = exoPlayer.isPlaying
+
+        val mediaItem = MediaItem.Builder()
+            .setUri(curVideo.uri)
+            .setSubtitleConfigurations(listOf(subtitleConfig))
+            .build()
+
+        exoPlayer.setMediaItem(mediaItem, currentPos)
+        exoPlayer.prepare()
+        if (wasPlaying) {
+            exoPlayer.play()
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+}
 private var speedBeforeBoost: Float = 1.0f
 private var currentPlaylist: List<VideoItem> = emptyList()
 private var currentPlaylistIndex: Int = -1
@@ -429,6 +523,38 @@ fun selectSubtitleTrack(trackItem: TrackItem?) {
         }
     }
 }
+fun selectVideoQualityTrack(trackItem: TrackItem?) {
+    if (trackItem == null) {
+        exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters
+            .buildUpon()
+            .clearOverridesOfType(C.TRACK_TYPE_VIDEO)
+            .build()
+        _videoQualityTracks.value = _videoQualityTracks.value.map { it.copy(isSelected = false) }
+    } else {
+        val currentTracks = exoPlayer.currentTracks
+        var videoGroupIdx = 0
+        for (group in currentTracks.groups) {
+            if (group.type == C.TRACK_TYPE_VIDEO) {
+                for (i in 0 until group.length) {
+                    val trackId = "video_${videoGroupIdx}_$i"
+                    if (trackId == trackItem.id ||
+                        (trackItem.groupIndex == videoGroupIdx && trackItem.trackIndex == i)
+                    ) {
+                        exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters
+                            .buildUpon()
+                            .setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, listOf(i)))
+                            .build()
+                        break
+                    }
+                }
+                videoGroupIdx++
+            }
+        }
+        _videoQualityTracks.value = _videoQualityTracks.value.map {
+            it.copy(isSelected = (it.id == trackItem.id))
+        }
+    }
+}
 fun setSleepTimer(preset: SleepTimerPreset, customMinutes: Int = 0) {
 sleepTimerJob?.cancel()
 val totalMinutes = when (preset) {
@@ -480,8 +606,10 @@ audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, safeVol, 0)
 private fun updateAvailableTracks(tracks: Tracks) {
     val audios = mutableListOf<TrackItem>()
     val subs = mutableListOf<TrackItem>()
+    val videoQualities = mutableListOf<TrackItem>()
     var audioGroupCount = 0
     var subGroupCount = 0
+    var videoGroupCount = 0
     for (group in tracks.groups) {
         if (group.type == C.TRACK_TYPE_AUDIO) {
             for (i in 0 until group.length) {
@@ -527,20 +655,55 @@ private fun updateAvailableTracks(tracks: Tracks) {
                 )
             }
             subGroupCount++
+        } else if (group.type == C.TRACK_TYPE_VIDEO) {
+            for (i in 0 until group.length) {
+                val format = group.getTrackFormat(i)
+                val width = format.width
+                val height = format.height
+                val bitrate = format.bitrate
+                val name = when {
+                    height > 0 && width > 0 -> "${height}p (${width}x${height})"
+                    !format.label.isNullOrBlank() -> format.label!!
+                    else -> "Quality Track ${videoQualities.size + 1}"
+                }
+                videoQualities.add(
+                    TrackItem(
+                        id = "video_${videoGroupCount}_$i",
+                        name = name,
+                        language = if (bitrate > 0) "${bitrate / 1000} kbps" else null,
+                        isSelected = group.isTrackSelected(i),
+                        groupIndex = videoGroupCount,
+                        trackIndex = i
+                    )
+                )
+            }
+            videoGroupCount++
         }
     }
     _audioTracks.value = audios
     _subtitleTracks.value = subs
+    _videoQualityTracks.value = videoQualities
 }
 private fun startPositionTracker() {
 positionUpdateJob?.cancel()
 positionUpdateJob = scope.launch {
 while (isActive) {
+val curPos = exoPlayer.currentPosition.coerceAtLeast(0L)
 if (pendingSeekTargetMs == null) {
-_currentPositionMs.value = exoPlayer.currentPosition.coerceAtLeast(0L)
+_currentPositionMs.value = curPos
 }
 _durationMs.value = exoPlayer.duration.coerceAtLeast(0L)
-delay(400)
+
+// A-B Repeat Loop Check
+if (_isAbRepeatActive.value) {
+val ptA = _repeatPointA.value ?: 0L
+val ptB = _repeatPointB.value
+if (ptB != null && curPos >= ptB) {
+exoPlayer.seekTo(ptA)
+}
+}
+
+delay(250)
 }
 }
 }

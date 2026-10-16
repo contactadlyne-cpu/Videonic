@@ -35,10 +35,19 @@ enum class AspectRatioMode(val label: String) {
     FOUR_THREE("4:3")
 }
 
+enum class AppColorTheme(val label: String, val primaryColorHex: Long) {
+    BLUE("Videonic Blue", 0xFF2563EB),
+    PURPLE("Cyber Purple", 0xFF8B5CF6),
+    EMERALD("Emerald Green", 0xFF10B981),
+    SUNSET("Sunset Amber", 0xFFF59E0B),
+    CRIMSON("Crimson Red", 0xFFEF4444)
+}
+
 class PreferencesManager(private val context: Context) {
 
     private object Keys {
         val THEME_MODE = stringPreferencesKey("theme_mode")
+        val APP_COLOR_THEME = stringPreferencesKey("app_color_theme")
         val DEFAULT_VIEW = stringPreferencesKey("default_view")
         val SHOW_THUMBNAILS = booleanPreferencesKey("show_thumbnails")
         val RESUME_PLAYBACK = booleanPreferencesKey("resume_playback")
@@ -50,11 +59,21 @@ class PreferencesManager(private val context: Context) {
         val SEEK_INTERVAL_SEC = intPreferencesKey("seek_interval_sec")
         val SORT_ORDER = stringPreferencesKey("sort_order")
         val HAS_SEEN_PERMISSION_PRIMER = booleanPreferencesKey("has_seen_permission_primer")
+        val PRIVATE_FOLDER_PIN = stringPreferencesKey("private_folder_pin")
     }
 
     val themeMode: Flow<ThemeMode> = context.dataStore.data.map { prefs ->
         val value = prefs[Keys.THEME_MODE] ?: ThemeMode.SYSTEM.name
         runCatching { ThemeMode.valueOf(value) }.getOrDefault(ThemeMode.SYSTEM)
+    }
+
+    val appColorTheme: Flow<AppColorTheme> = context.dataStore.data.map { prefs ->
+        val value = prefs[Keys.APP_COLOR_THEME] ?: AppColorTheme.BLUE.name
+        runCatching { AppColorTheme.valueOf(value) }.getOrDefault(AppColorTheme.BLUE)
+    }
+
+    val privateFolderPin: Flow<String?> = context.dataStore.data.map { prefs ->
+        prefs[Keys.PRIVATE_FOLDER_PIN]
     }
 
     val viewLayout: Flow<ViewLayout> = context.dataStore.data.map { prefs ->
@@ -153,4 +172,17 @@ class PreferencesManager(private val context: Context) {
         context.dataStore.edit { it[Keys.HAS_SEEN_PERMISSION_PRIMER] = seen }
     }
 
+    suspend fun setAppColorTheme(theme: AppColorTheme) {
+        context.dataStore.edit { it[Keys.APP_COLOR_THEME] = theme.name }
+    }
+
+    suspend fun setPrivateFolderPin(pin: String?) {
+        context.dataStore.edit {
+            if (pin == null) {
+                it.remove(Keys.PRIVATE_FOLDER_PIN)
+            } else {
+                it[Keys.PRIVATE_FOLDER_PIN] = pin
+            }
+        }
+    }
 }

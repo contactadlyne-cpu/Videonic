@@ -99,4 +99,17 @@ interface VideoDao {
 
     @Query("DELETE FROM recycle_bin")
     suspend fun clearRecycleBin()
+
+    // --- Private Videos ---
+    @Query("SELECT * FROM private_videos ORDER BY dateAdded DESC")
+    fun getPrivateVideos(): Flow<List<com.example.data.local.entities.PrivateVideoEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertPrivateVideo(item: com.example.data.local.entities.PrivateVideoEntity)
+
+    @Query("DELETE FROM private_videos WHERE uriString = :uriString")
+    suspend fun removePrivateVideo(uriString: String)
+
+    @Query("SELECT EXISTS(SELECT 1 FROM private_videos WHERE uriString = :uriString)")
+    suspend fun isPrivateVideo(uriString: String): Boolean
 }

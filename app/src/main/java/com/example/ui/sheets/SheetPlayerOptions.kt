@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.ScreenRotation
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -60,7 +61,8 @@ fun SheetPlayerOptions(
     onOpenAudioSub: () -> Unit,
     onOpenSleepTimer: () -> Unit,
     onOpenEqualizer: () -> Unit = {},
-    onOpenDecoder: () -> Unit = {}
+    onOpenDecoder: () -> Unit = {},
+    onOpenQuality: () -> Unit = {}
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
@@ -154,6 +156,14 @@ fun SheetPlayerOptions(
                 onClick = onOpenAudioSub
             )
 
+            // Video Quality
+            OptionRowItem(
+                icon = Icons.Default.Tune,
+                title = "Video quality",
+                value = playbackManager.videoQualityTracks.value.find { it.isSelected }?.name ?: "Auto",
+                onClick = onOpenQuality
+            )
+
             // Sleep timer
             OptionRowItem(
                 icon = Icons.Default.Timer,
@@ -170,6 +180,35 @@ fun SheetPlayerOptions(
                 onCheckedChange = { playbackManager.toggleRepeatOne() }
             )
 
+            // Video Mirror Mode (Horizontal Flip)
+            OptionToggleRow(
+                icon = Icons.Default.ScreenRotation,
+                title = "Mirror video (Horizontal flip)",
+                checked = playbackManager.isMirrored.value,
+                onCheckedChange = { playbackManager.toggleMirror() }
+            )
+
+            // A-B Repeat Mode
+            val isAbActive = playbackManager.isAbRepeatActive.value
+            val ptA = playbackManager.repeatPointA.value
+            val ptB = playbackManager.repeatPointB.value
+            val abLabel = when {
+                isAbActive && ptA != null && ptB != null -> "Looping (${com.example.ui.screens.formatTime(ptA)} - ${com.example.ui.screens.formatTime(ptB)})"
+                ptA != null -> "Point A set (${com.example.ui.screens.formatTime(ptA)}) • Tap for B"
+                else -> "Off • Tap to set Point A"
+            }
+            OptionRowItem(
+                icon = Icons.Default.Repeat,
+                title = "A-B Repeat",
+                value = abLabel,
+                onClick = {
+                    when {
+                        ptA == null -> playbackManager.setRepeatPointA()
+                        !isAbActive -> playbackManager.setRepeatPointB()
+                        else -> playbackManager.clearAbRepeat()
+                    }
+                }
+            )
 
             // Screen lock
             OptionRowItem(

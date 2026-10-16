@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Feedback
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.Settings
@@ -63,8 +64,10 @@ fun ScreenMe(
     videos: List<VideoItem>,
     favoritesCount: Int,
     playlistsCount: Int,
+    privateVideosCount: Int = 0,
     onOpenFavorites: () -> Unit,
     onOpenPlaylists: () -> Unit,
+    onOpenPrivateFolder: () -> Unit,
     onOpenRecycleBin: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenThemeDialog: () -> Unit,
@@ -188,6 +191,14 @@ fun ScreenMe(
                     title = "Playlists",
                     badge = "$playlistsCount lists",
                     onClick = onOpenPlaylists
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                MeNavRow(
+                    icon = Icons.Default.Lock,
+                    iconTint = VideonicPrimary,
+                    title = "Private Folder",
+                    badge = if (privateVideosCount > 0) "$privateVideosCount protected" else "PIN protected",
+                    onClick = onOpenPrivateFolder
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
                 MeNavRow(

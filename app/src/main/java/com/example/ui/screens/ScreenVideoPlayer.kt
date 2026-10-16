@@ -16,6 +16,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -57,6 +58,7 @@ import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Subtitles
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.filled.ScreenLockPortrait
 import androidx.compose.material3.Button
@@ -87,6 +89,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -107,6 +110,7 @@ import com.example.player.PlaybackManager
 import com.example.ui.dialogs.DialogDecoderSelector
 import com.example.ui.dialogs.DialogEqualizer
 import com.example.ui.dialogs.DialogSpeedSelector
+import com.example.ui.dialogs.DialogVideoQualitySelector
 import com.example.ui.theme.VideonicPrimary
 import kotlinx.coroutines.delay
 import java.util.Locale
@@ -159,6 +163,7 @@ fun ScreenVideoPlayer(
     var showSpeedDialog by remember { mutableStateOf(false) }
     var showDecoderDialog by remember { mutableStateOf(false) }
     var showEqualizerDialog by remember { mutableStateOf(false) }
+    var showQualityDialog by remember { mutableStateOf(false) }
 
     // Manage Activity Orientation based on setting
     LaunchedEffect(autoRotateSetting) {
@@ -186,10 +191,18 @@ fun ScreenVideoPlayer(
             activity?.window?.attributes?.screenBrightness?.takeIf { it >= 0 } ?: 0.5f
         )
     }
+    var activeLeftControlMode by remember { mutableStateOf(GestureType.BRIGHTNESS) }
+
+    // Mirroring, A-B Repeat and Pinch Zoom states
+    val isMirrored by playbackManager.isMirrored.collectAsState()
+    val isAbRepeatActive by playbackManager.isAbRepeatActive.collectAsState()
+    val repeatPointA by playbackManager.repeatPointA.collectAsState()
+    val repeatPointB by playbackManager.repeatPointB.collectAsState()
+    var zoomScale by remember { mutableFloatStateOf(1f) }
 
     // Auto-hide controls timer (4s)
-    LaunchedEffect(areControlsVisible, isPlaying, isDraggingSlider, isSpeedBoostActive, showSpeedDialog, showDecoderDialog, showEqualizerDialog) {
-        if (areControlsVisible && isPlaying && !isDraggingSlider && !isSpeedBoostActive && !showSpeedDialog && !showDecoderDialog && !showEqualizerDialog) {
+    LaunchedEffect(areControlsVisible, isPlaying, isDraggingSlider, isSpeedBoostActive, showSpeedDialog, showDecoderDialog, showEqualizerDialog, showQualityDialog) {
+        if (areControlsVisible && isPlaying && !isDraggingSlider && !isSpeedBoostActive && !showSpeedDialog && !showDecoderDialog && !showEqualizerDialog && !showQualityDialog) {
             delay(4000)
             areControlsVisible = false
         }
@@ -234,6 +247,8 @@ fun ScreenVideoPlayer(
 
                 var lastTapTime = 0L
                 var lastTapX = 0f
+                var initialPinchSpan = 0f
+                var baseZoomScale = 1f
 
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
@@ -245,12 +260,36 @@ fun ScreenVideoPlayer(
                     var dragMode = PlayerDragMode.NONE
                     var startVolume = playbackManager.getCurrentVolume()
                     val maxVolume = playbackManager.getMaxVolume()
-                    val startBrightness = currentBrightness
+                    var startBrightness = currentBrightness
                     var scrubTargetMs = playbackManager.exoPlayer.currentPosition
                     var currentGestureSpeed = 2.0f
+                    initialPinchSpan = 0f
 
                     while (true) {
                         val event = awaitPointerEvent()
+                        val pressedChanges = event.changes.filter { it.pressed }
+
+                        // 2-Finger Pinch to Zoom Detection
+                        if (pressedChanges.size >= 2) {
+                            val p0 = pressedChanges[0].position
+                            val p1 = pressedChanges[1].position
+                            val span = hypot((p0.x - p1.x).toDouble(), (p0.y - p1.y).toDouble()).toFloat()
+                            if (initialPinchSpan == 0f) {
+                                initialPinchSpan = span
+                                baseZoomScale = zoomScale
+                            } else if (initialPinchSpan > 0f) {
+                                val newScale = (baseZoomScale * (span / initialPinchSpan)).coerceIn(1.0f, 3.5f)
+                                zoomScale = newScale
+                                gestureState = GestureState(
+                                    type = GestureType.ASPECT,
+                                    valueLabel = "Zoom ${(newScale * 100).toInt()}%",
+                                    progress = (newScale - 1f) / 2.5f
+                                )
+                            }
+                            pressedChanges.forEach { it.consume() }
+                            continue
+                        }
+
                         val change = event.changes.firstOrNull { it.id == down.id } ?: break
 
                         if (!change.pressed) {
@@ -263,23 +302,35 @@ fun ScreenVideoPlayer(
                         val distance = hypot(dx.toDouble(), dy.toDouble()).toFloat()
                         val elapsed = System.currentTimeMillis() - downTime
 
-
-
-                        // 1. Fast Long-press detection (>120ms) -> Immediate Press & Hold Speed Control!
-                        if (dragMode == PlayerDragMode.NONE) {
-                            if (elapsed > 120 && abs(dy) < 30f && !isSpeedBoostTriggered) {
-                                isSpeedBoostTriggered = true
-                                currentGestureSpeed = if (playbackSpeed < 1.25f) 2.0f else playbackSpeed
-                                playbackManager.setTemporarySpeedBoost(true, currentGestureSpeed)
-                            } else if (distance > 24f && !isSpeedBoostTriggered) {
+                        // 1. Detect directional swipe or long-press
+                        if (dragMode == PlayerDragMode.NONE && !isSpeedBoostTriggered) {
+                            if (distance > 16f) {
                                 // Direction Lock
                                 if (abs(dy) > abs(dx)) {
-                                    dragMode = if (isLeft) PlayerDragMode.BRIGHTNESS else PlayerDragMode.VOLUME
-                                    startVolume = playbackManager.getCurrentVolume()
+                                    // Vertical swipe gesture
+                                    // Left side adjusts Brightness or Volume based on activeLeftControlMode (default Brightness)
+                                    // Right side adjusts Volume
+                                    if (downPos.x < size.width * 0.5f) {
+                                        if (activeLeftControlMode == GestureType.VOLUME) {
+                                            dragMode = PlayerDragMode.VOLUME
+                                            startVolume = playbackManager.getCurrentVolume()
+                                        } else {
+                                            dragMode = PlayerDragMode.BRIGHTNESS
+                                            startBrightness = currentBrightness
+                                        }
+                                    } else {
+                                        dragMode = PlayerDragMode.VOLUME
+                                        startVolume = playbackManager.getCurrentVolume()
+                                    }
                                 } else {
                                     dragMode = PlayerDragMode.SEEK
                                     scrubTargetMs = playbackManager.exoPlayer.currentPosition
                                 }
+                            } else if (elapsed > 450L && distance < 18f) {
+                                // Press & Hold for 2x Speed Boost (only when held stationary)
+                                isSpeedBoostTriggered = true
+                                currentGestureSpeed = if (playbackSpeed < 1.25f) 2.0f else playbackSpeed
+                                playbackManager.setTemporarySpeedBoost(true, currentGestureSpeed)
                             }
                         }
 
@@ -299,7 +350,7 @@ fun ScreenVideoPlayer(
                             when (dragMode) {
                                 PlayerDragMode.BRIGHTNESS -> {
                                     change.consume()
-                                    val delta = -dy / (size.height * 0.75f)
+                                    val delta = -dy / (size.height * 0.55f)
                                     val newBrightness = (startBrightness + delta).coerceIn(0.01f, 1f)
                                     currentBrightness = newBrightness
                                     activity?.window?.let { win ->
@@ -316,7 +367,7 @@ fun ScreenVideoPlayer(
 
                                 PlayerDragMode.VOLUME -> {
                                     change.consume()
-                                    val delta = -dy / (size.height * 0.75f)
+                                    val delta = -dy / (size.height * 0.55f)
                                     val volChange = (delta * maxVolume).toInt()
                                     val newVol = (startVolume + volChange).coerceIn(0, maxVolume)
                                     playbackManager.setVolume(newVol)
@@ -363,7 +414,9 @@ fun ScreenVideoPlayer(
                         val now = System.currentTimeMillis()
                         if (now - lastTapTime < 320L && hypot((downPos.x - lastTapX).toDouble(), 0.0) < 120) {
                             // Double tap
-                            if (downPos.x < size.width / 2) {
+                            if (zoomScale > 1.05f) {
+                                zoomScale = 1f
+                            } else if (downPos.x < size.width / 2) {
                                 playbackManager.seekRelative(-10000)
                                 gestureState = GestureState(GestureType.SEEK, "-10s", 0f)
                             } else {
@@ -383,12 +436,87 @@ fun ScreenVideoPlayer(
                 }
             }
     ) {
-        // ExoPlayer View
+        // ExoPlayer View with Pinch-to-Zoom & Horizontal Video Mirror
         VideoPlayerSurface(
             playbackManager = playbackManager,
             aspectRatioMode = aspectRatioMode,
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    scaleX = (if (isMirrored) -1f else 1f) * zoomScale
+                    scaleY = zoomScale
+                }
         )
+
+        // Reset Zoom badge if zoomed in
+        if (zoomScale > 1.05f) {
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = Color(0xCC000000),
+                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.5f)),
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .statusBarsPadding()
+                    .padding(top = 16.dp, end = 16.dp)
+                    .clickable { zoomScale = 1f }
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Zoom ${(zoomScale * 100).toInt()}% • Reset",
+                        color = Color.White,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+
+        // Active A-B Repeat Loop Banner
+        if (isAbRepeatActive && repeatPointA != null && repeatPointB != null) {
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = Color(0xDD0F172A),
+                border = BorderStroke(1.dp, VideonicPrimary),
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+                    .padding(top = 70.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Replay,
+                        contentDescription = null,
+                        tint = VideonicPrimary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "A-B Loop: ${formatTime(repeatPointA!!)} - ${formatTime(repeatPointB!!)}",
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    IconButton(
+                        onClick = { playbackManager.clearAbRepeat() },
+                        modifier = Modifier.size(20.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Clear A-B Repeat",
+                            tint = Color.White,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                }
+            }
+        }
 
         // Small Compact Upper Center Speed Selection Popup
         val availableSpeeds = remember { listOf(0.5f, 1.0f, 2.0f, 4.0f) }
@@ -438,8 +566,69 @@ fun ScreenVideoPlayer(
             }
         }
 
-        // Gesture HUD Overlay (Volume, Brightness, Seek, Aspect Ratio)
-        if (gestureState.type != GestureType.NONE) {
+        // Vertical Swipe Gesture Control on Left Side (Screen Brightness & Volume)
+        val isVerticalGestureActive = gestureState.type == GestureType.BRIGHTNESS || gestureState.type == GestureType.VOLUME
+        val showLeftVerticalControl = (isVerticalGestureActive || areControlsVisible) && !isLocked
+
+        if (showLeftVerticalControl) {
+            val displayType = if (isVerticalGestureActive) gestureState.type else activeLeftControlMode
+            val currentVolume = playbackManager.getCurrentVolume()
+            val maxVolume = playbackManager.getMaxVolume().coerceAtLeast(1)
+            val displayProgress = if (displayType == GestureType.BRIGHTNESS) {
+                currentBrightness
+            } else {
+                currentVolume.toFloat() / maxVolume.toFloat()
+            }
+            val displayLabel = if (displayType == GestureType.BRIGHTNESS) {
+                "${(currentBrightness * 100).toInt()}%"
+            } else {
+                "$currentVolume / $maxVolume"
+            }
+
+            VerticalSwipeGestureControl(
+                type = displayType,
+                progress = displayProgress,
+                valueLabel = displayLabel,
+                isInteractive = isVerticalGestureActive,
+                onModeToggle = {
+                    activeLeftControlMode = if (activeLeftControlMode == GestureType.BRIGHTNESS) {
+                        GestureType.VOLUME
+                    } else {
+                        GestureType.BRIGHTNESS
+                    }
+                },
+                onProgressChange = { newProgress ->
+                    if (displayType == GestureType.BRIGHTNESS) {
+                        val newBrightness = newProgress.coerceIn(0.01f, 1f)
+                        currentBrightness = newBrightness
+                        activity?.window?.let { win ->
+                            val lp = win.attributes
+                            lp.screenBrightness = newBrightness
+                            win.attributes = lp
+                        }
+                        gestureState = GestureState(
+                            type = GestureType.BRIGHTNESS,
+                            valueLabel = "${(newBrightness * 100).toInt()}%",
+                            progress = newBrightness
+                        )
+                    } else {
+                        val newVol = (newProgress * maxVolume).toInt().coerceIn(0, maxVolume)
+                        playbackManager.setVolume(newVol)
+                        gestureState = GestureState(
+                            type = GestureType.VOLUME,
+                            valueLabel = "$newVol / $maxVolume",
+                            progress = newVol.toFloat() / maxVolume.toFloat().coerceAtLeast(1f)
+                        )
+                    }
+                },
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .padding(start = 20.dp)
+            )
+        }
+
+        // Center Gesture HUD Overlay (Seek, Aspect Ratio, Speed)
+        if (gestureState.type == GestureType.SEEK || gestureState.type == GestureType.ASPECT || gestureState.type == GestureType.SPEED) {
             Box(
                 modifier = Modifier
                     .align(Alignment.Center)
@@ -451,8 +640,6 @@ fun ScreenVideoPlayer(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(
                         imageVector = when (gestureState.type) {
-                            GestureType.VOLUME -> Icons.Default.VolumeUp
-                            GestureType.BRIGHTNESS -> Icons.Default.BrightnessMedium
                             GestureType.SEEK -> Icons.Default.Forward10
                             GestureType.ASPECT -> Icons.Default.AspectRatio
                             GestureType.SPEED -> Icons.Default.Speed
@@ -884,6 +1071,14 @@ fun ScreenVideoPlayer(
                             label = "EQ",
                             onClick = { showEqualizerDialog = true }
                         )
+
+                        // Video Quality Selector
+                        val qualityTracks by playbackManager.videoQualityTracks.collectAsState()
+                        QuickActionButton(
+                            icon = Icons.Default.Tune,
+                            label = "Quality",
+                            onClick = { showQualityDialog = true }
+                        )
                     }
                 }
             }
@@ -964,6 +1159,15 @@ fun ScreenVideoPlayer(
                 onDismiss = { showEqualizerDialog = false }
             )
         }
+
+        if (showQualityDialog) {
+            val qualityTracks by playbackManager.videoQualityTracks.collectAsState()
+            DialogVideoQualitySelector(
+                qualityTracks = qualityTracks,
+                onDismiss = { showQualityDialog = false },
+                onSelectQuality = { track -> playbackManager.selectVideoQualityTrack(track) }
+            )
+        }
     }
 }
 
@@ -1040,5 +1244,100 @@ fun VideoPlayerSurface(
         },
         modifier = modifier
     )
+}
+
+@Composable
+fun VerticalSwipeGestureControl(
+    type: GestureType,
+    progress: Float,
+    valueLabel: String,
+    isInteractive: Boolean,
+    onModeToggle: () -> Unit,
+    onProgressChange: (Float) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val isBrightness = type == GestureType.BRIGHTNESS
+    val accentColor = if (isBrightness) Color(0xFFFBBF24) else VideonicPrimary
+    val trackGradient = if (isBrightness) {
+        Brush.verticalGradient(listOf(Color(0xFFFBBF24), Color(0xFFF59E0B)))
+    } else {
+        Brush.verticalGradient(listOf(Color(0xFF38BDF8), VideonicPrimary))
+    }
+
+    Surface(
+        shape = RoundedCornerShape(28.dp),
+        color = Color(0xF00F172A),
+        border = BorderStroke(1.5.dp, accentColor.copy(alpha = if (isInteractive) 0.85f else 0.4f)),
+        shadowElevation = 8.dp,
+        modifier = modifier
+            .width(60.dp)
+            .testTag("left_vertical_swipe_control")
+            .pointerInput(type, progress) {
+                detectVerticalDragGestures { change, dragAmount ->
+                    change.consume()
+                    val delta = -dragAmount / 110.dp.toPx()
+                    val newProgress = (progress + delta).coerceIn(0.01f, 1f)
+                    onProgressChange(newProgress)
+                }
+            }
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(vertical = 14.dp, horizontal = 6.dp)
+        ) {
+            // Mode toggle icon button
+            IconButton(
+                onClick = onModeToggle,
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(accentColor.copy(alpha = 0.15f))
+                    .testTag("vertical_control_toggle_button")
+            ) {
+                Icon(
+                    imageVector = if (isBrightness) Icons.Default.BrightnessMedium else Icons.Default.VolumeUp,
+                    contentDescription = if (isBrightness) "Screen Brightness" else "Volume",
+                    tint = accentColor,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            // Value label
+            Text(
+                text = valueLabel,
+                color = Color.White,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1
+            )
+
+            // Vertical Progress Slider Track
+            Box(
+                modifier = Modifier
+                    .width(12.dp)
+                    .height(110.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(Color.White.copy(alpha = 0.2f)),
+                contentAlignment = Alignment.BottomCenter
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height((110 * progress.coerceIn(0.02f, 1f)).dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(trackGradient)
+                )
+            }
+
+            // Mode indicator text
+            Text(
+                text = if (isBrightness) "BRIGHT" else "VOLUME",
+                color = Color.White.copy(alpha = 0.7f),
+                fontSize = 8.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+    }
 }
 

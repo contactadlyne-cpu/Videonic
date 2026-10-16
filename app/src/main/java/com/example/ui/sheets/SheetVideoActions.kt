@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Share
@@ -52,6 +53,7 @@ fun SheetVideoActions(
     onPlay: () -> Unit,
     onToggleFavorite: () -> Unit,
     onAddToPlaylist: () -> Unit,
+    onMoveToPrivate: () -> Unit = {},
     onRename: () -> Unit,
     onDelete: () -> Unit,
     onInfo: () -> Unit
@@ -144,6 +146,16 @@ fun SheetVideoActions(
                 onClick = {
                     onDismiss()
                     onRename()
+                }
+            )
+
+            ActionItemRow(
+                icon = Icons.Default.Lock,
+                title = "Move to Private Vault",
+                iconTint = VideonicPrimary,
+                onClick = {
+                    onDismiss()
+                    onMoveToPrivate()
                 }
             )
 

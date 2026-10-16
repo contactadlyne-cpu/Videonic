@@ -66,12 +66,16 @@ import com.example.data.preferences.ThemeMode
 import com.example.player.PlaybackManager
 import com.example.player.SleepTimerPreset
 import com.example.ui.components.HomeTab
+import com.example.ui.components.MiniPlayerBar
 import com.example.ui.components.VideonicTabs
 import com.example.ui.components.VideonicTopBar
 import com.example.ui.dialogs.DialogAddToPlaylist
+import com.example.ui.dialogs.DialogDecoderSelector
+import com.example.ui.dialogs.DialogEqualizer
 import com.example.ui.dialogs.DialogRename
 import com.example.ui.dialogs.DialogSleepTimer
 import com.example.ui.dialogs.DialogThemeSelection
+import com.example.ui.dialogs.DialogVideoQualitySelector
 import com.example.ui.sheets.SheetAudio
 import com.example.ui.sheets.SheetSubtitles
 import com.example.ui.sheets.SheetMoreMenu
@@ -99,7 +103,8 @@ enum class CurrentScreen {
     REPORT,
     PRIVACY_POLICY,
     LICENSES,
-    RECYCLE_BIN
+    RECYCLE_BIN,
+    PRIVATE_FOLDER
 }
 
 enum class BottomNavTab(val label: String, val icon: ImageVector) {
@@ -123,6 +128,7 @@ fun MainApp(
     val settingsViewModel: SettingsViewModel = viewModel()
 
     val themeMode by settingsViewModel.themeMode.collectAsState()
+    val appColorTheme by settingsViewModel.appColorTheme.collectAsState()
     val isSystemDark = isSystemInDarkTheme()
     val isDarkTheme = when (themeMode) {
         ThemeMode.LIGHT -> false
@@ -206,6 +212,9 @@ fun MainApp(
     var showAddToPlaylistDialog by remember { mutableStateOf(false) }
     var showSleepTimerDialog by remember { mutableStateOf(false) }
     var showThemeDialog by remember { mutableStateOf(false) }
+    var showEqualizerDialog by remember { mutableStateOf(false) }
+    var showDecoderDialog by remember { mutableStateOf(false) }
+    var showQualityDialog by remember { mutableStateOf(false) }
     var showRenameDialog by remember { mutableStateOf(false) }
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
     var videoToDelete by remember { mutableStateOf<VideoItem?>(null) }
@@ -266,7 +275,7 @@ fun MainApp(
         }
     }
 
-    VideonicLiteTheme(darkTheme = isDarkTheme) {
+    VideonicLiteTheme(darkTheme = isDarkTheme, appColorTheme = appColorTheme) {
         Box(modifier = Modifier.fillMaxSize()) {
             when (currentScreen) {
                 CurrentScreen.SPLASH -> {
@@ -297,7 +306,7 @@ fun MainApp(
                     )
                 }
 
-                CurrentScreen.HOME, CurrentScreen.FAVORITES, CurrentScreen.PLAYLISTS, CurrentScreen.RECYCLE_BIN, CurrentScreen.SETTINGS, CurrentScreen.ABOUT, CurrentScreen.REPORT -> {
+                CurrentScreen.HOME, CurrentScreen.FOLDER_DETAILS, CurrentScreen.FAVORITES, CurrentScreen.PLAYLISTS, CurrentScreen.RECYCLE_BIN, CurrentScreen.PRIVATE_FOLDER, CurrentScreen.SETTINGS, CurrentScreen.ABOUT, CurrentScreen.REPORT -> {
                     BackHandler {
                         if (currentScreen != CurrentScreen.HOME) {
                             currentScreen = CurrentScreen.HOME
@@ -324,6 +333,7 @@ fun MainApp(
                     val recentList by libraryViewModel.watchHistory.collectAsState()
                     val favoritesList by libraryViewModel.favorites.collectAsState()
                     val playlistsList by playlistViewModel.playlists.collectAsState()
+                    val privateVideosList by libraryViewModel.privateVideos.collectAsState()
 
                     val launchVideoWithResumeCheck: (VideoItem, List<VideoItem>) -> Unit = { video, playlist ->
                         val savedPos = libraryViewModel.getWatchPosition(video.uri.toString())
@@ -335,61 +345,74 @@ fun MainApp(
 
                     Scaffold(
                         topBar = {
-                            val title = when (currentScreen) {
-                                CurrentScreen.FAVORITES -> "Favorites"
-                                CurrentScreen.PLAYLISTS -> "Playlists"
-                                CurrentScreen.RECYCLE_BIN -> "Recycle Bin"
-                                CurrentScreen.SETTINGS -> "Settings"
-                                CurrentScreen.ABOUT -> "About"
-                                CurrentScreen.REPORT -> "Report & Feedback"
-                                else -> when (selectedBottomTab) {
-                                    BottomNavTab.VIDEOS -> "Videonic Lite"
-                                    BottomNavTab.FOLDERS -> "Folders"
-                                    BottomNavTab.RECENT -> "Recent"
-                                    BottomNavTab.ME -> ""
+                            if (currentScreen != CurrentScreen.FOLDER_DETAILS) {
+                                val title = when (currentScreen) {
+                                    CurrentScreen.FAVORITES -> "Favorites"
+                                    CurrentScreen.PLAYLISTS -> "Playlists"
+                                    CurrentScreen.RECYCLE_BIN -> "Recycle Bin"
+                                    CurrentScreen.SETTINGS -> "Settings"
+                                    CurrentScreen.ABOUT -> "About"
+                                    CurrentScreen.REPORT -> "Report & Feedback"
+                                    else -> when (selectedBottomTab) {
+                                        BottomNavTab.VIDEOS -> "Videonic Lite"
+                                        BottomNavTab.FOLDERS -> "Folders"
+                                        BottomNavTab.RECENT -> "Recent"
+                                        BottomNavTab.ME -> ""
+                                    }
                                 }
+                                VideonicTopBar(
+                                    title = title,
+                                    showActions = currentScreen == CurrentScreen.HOME && selectedBottomTab != BottomNavTab.ME,
+                                    viewLayout = viewLayout,
+                                    onSearchClick = { currentScreen = CurrentScreen.SEARCH },
+                                    onRefreshClick = { libraryViewModel.loadVideos() },
+                                    onViewLayoutChange = { libraryViewModel.setViewLayout(it) },
+                                    onSortOrderChange = { libraryViewModel.setSortOrder(it) }
+                                )
                             }
-                            VideonicTopBar(
-                                title = title,
-                                showActions = currentScreen == CurrentScreen.HOME && selectedBottomTab != BottomNavTab.ME,
-                                viewLayout = viewLayout,
-                                onSearchClick = { currentScreen = CurrentScreen.SEARCH },
-                                onRefreshClick = { libraryViewModel.loadVideos() },
-                                onViewLayoutChange = { libraryViewModel.setViewLayout(it) },
-                                onSortOrderChange = { libraryViewModel.setSortOrder(it) }
-                            )
                         },
                         bottomBar = {
-                            NavigationBar(
-                                containerColor = MaterialTheme.colorScheme.surface,
-                                tonalElevation = 3.dp,
-                                modifier = Modifier.testTag("bottom_navigation_bar")
-                            ) {
-                                BottomNavTab.values().forEach { tab ->
-                                    val isSelected = selectedBottomTab == tab && currentScreen == CurrentScreen.HOME
-                                    NavigationBarItem(
-                                        selected = isSelected,
-                                        onClick = {
-                                            selectedBottomTab = tab
-                                            currentScreen = CurrentScreen.HOME
-                                        },
-                                        icon = { Icon(imageVector = tab.icon, contentDescription = tab.label) },
-                                        label = {
-                                            Text(
-                                                text = tab.label,
-                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                                fontSize = 11.sp
-                                            )
-                                        },
-                                        colors = NavigationBarItemDefaults.colors(
-                                            selectedIconColor = Color.White,
-                                            selectedTextColor = VideonicPrimary,
-                                            indicatorColor = VideonicPrimary,
-                                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
-                                        ),
-                                        modifier = Modifier.testTag("bottom_nav_${tab.name.lowercase()}")
+                            Column {
+                                val curPlayingVideo by playbackManager.currentVideo.collectAsState()
+                                if (curPlayingVideo != null && currentScreen != CurrentScreen.PLAYER) {
+                                    MiniPlayerBar(
+                                        playbackManager = playbackManager,
+                                        onExpandPlayer = { currentScreen = CurrentScreen.PLAYER }
                                     )
+                                }
+                                if (currentScreen == CurrentScreen.HOME) {
+                                    NavigationBar(
+                                        containerColor = MaterialTheme.colorScheme.surface,
+                                        tonalElevation = 3.dp,
+                                        modifier = Modifier.testTag("bottom_navigation_bar")
+                                    ) {
+                                        BottomNavTab.values().forEach { tab ->
+                                            val isSelected = selectedBottomTab == tab && currentScreen == CurrentScreen.HOME
+                                            NavigationBarItem(
+                                                selected = isSelected,
+                                                onClick = {
+                                                    selectedBottomTab = tab
+                                                    currentScreen = CurrentScreen.HOME
+                                                },
+                                                icon = { Icon(imageVector = tab.icon, contentDescription = tab.label) },
+                                                label = {
+                                                    Text(
+                                                        text = tab.label,
+                                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                                        fontSize = 11.sp
+                                                    )
+                                                },
+                                                colors = NavigationBarItemDefaults.colors(
+                                                    selectedIconColor = Color.White,
+                                                    selectedTextColor = VideonicPrimary,
+                                                    indicatorColor = VideonicPrimary,
+                                                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                                ),
+                                                modifier = Modifier.testTag("bottom_nav_${tab.name.lowercase()}")
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -462,8 +485,10 @@ fun MainApp(
                                                 videos = allVideosList,
                                                 favoritesCount = favoritesList.size,
                                                 playlistsCount = playlistsList.size,
+                                                privateVideosCount = privateVideosList.size,
                                                 onOpenFavorites = { currentScreen = CurrentScreen.FAVORITES },
                                                 onOpenPlaylists = { currentScreen = CurrentScreen.PLAYLISTS },
+                                                onOpenPrivateFolder = { currentScreen = CurrentScreen.PRIVATE_FOLDER },
                                                 onOpenRecycleBin = { currentScreen = CurrentScreen.RECYCLE_BIN },
                                                 onOpenSettings = { currentScreen = CurrentScreen.SETTINGS },
                                                 onOpenThemeDialog = { showThemeDialog = true },
@@ -558,6 +583,17 @@ fun MainApp(
                                 CurrentScreen.REPORT -> {
                                     ScreenReport(onBackClick = { currentScreen = CurrentScreen.HOME })
                                 }
+
+                                CurrentScreen.PRIVATE_FOLDER -> {
+                                    ScreenPrivateFolder(
+                                        libraryViewModel = libraryViewModel,
+                                        onBackClick = { currentScreen = CurrentScreen.HOME },
+                                        onPlayPrivateVideo = { privVideo ->
+                                            playbackManager.playUri(Uri.parse(privVideo.uriString), privVideo.title)
+                                            currentScreen = CurrentScreen.PLAYER
+                                        }
+                                    )
+                                }
                                 else -> {}
                             }
                         }
@@ -569,27 +605,38 @@ fun MainApp(
                     BackHandler { currentScreen = CurrentScreen.HOME }
                     val query by libraryViewModel.searchQuery.collectAsState()
                     val filtered by libraryViewModel.filteredVideos.collectAsState()
+                    val curPlayingVideo by playbackManager.currentVideo.collectAsState()
 
-                    ScreenSearch(
-                        query = query,
-                        onQueryChange = { libraryViewModel.setSearchQuery(it) },
-                        results = filtered,
-                        onBackClick = {
-                            libraryViewModel.setSearchQuery("")
-                            currentScreen = CurrentScreen.HOME
-                        },
-                        onVideoClick = { video ->
-                            val savedPos = libraryViewModel.getWatchPosition(video.uri.toString())
-                            val shouldResume = resumePlayback && savedPos > 3000L && (video.durationMs <= 0 || savedPos < video.durationMs - 5000L)
-                            val startPos = if (shouldResume) savedPos else 0L
-                            playbackManager.playVideo(video, startPos, filtered)
-                            currentScreen = CurrentScreen.PLAYER
-                        },
-                        onVideoOptionsClick = { video ->
-                            selectedVideoForAction = video
-                            showVideoActionsSheet = true
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        Box(modifier = Modifier.weight(1f)) {
+                            ScreenSearch(
+                                query = query,
+                                onQueryChange = { libraryViewModel.setSearchQuery(it) },
+                                results = filtered,
+                                onBackClick = {
+                                    libraryViewModel.setSearchQuery("")
+                                    currentScreen = CurrentScreen.HOME
+                                },
+                                onVideoClick = { video ->
+                                    val savedPos = libraryViewModel.getWatchPosition(video.uri.toString())
+                                    val shouldResume = resumePlayback && savedPos > 3000L && (video.durationMs <= 0 || savedPos < video.durationMs - 5000L)
+                                    val startPos = if (shouldResume) savedPos else 0L
+                                    playbackManager.playVideo(video, startPos, filtered)
+                                    currentScreen = CurrentScreen.PLAYER
+                                },
+                                onVideoOptionsClick = { video ->
+                                    selectedVideoForAction = video
+                                    showVideoActionsSheet = true
+                                }
+                            )
                         }
-                    )
+                        if (curPlayingVideo != null) {
+                            MiniPlayerBar(
+                                playbackManager = playbackManager,
+                                onExpandPlayer = { currentScreen = CurrentScreen.PLAYER }
+                            )
+                        }
+                    }
                 }
 
                 CurrentScreen.PLAYER -> {
@@ -637,62 +684,73 @@ fun MainApp(
                     val selectedPlaylist by playlistViewModel.selectedPlaylist.collectAsState()
                     val playlistItems by playlistViewModel.selectedPlaylistItems.collectAsState()
                     val allVideos by libraryViewModel.allVideos.collectAsState()
+                    val curPlayingVideo by playbackManager.currentVideo.collectAsState()
 
-                    if (selectedPlaylist != null) {
-                        ScreenPlaylistDetails(
-                            playlist = selectedPlaylist!!,
-                            items = playlistItems,
-                            allVideos = allVideos,
-                            autoOpenAddVideos = autoOpenAddVideosForPlaylist,
-                            onBackClick = {
-                                autoOpenAddVideosForPlaylist = false
-                                currentScreen = CurrentScreen.PLAYLISTS
-                            },
-                            onPlayItem = { item ->
-                                val playlistVideos = playlistItems.mapNotNull { pi -> allVideos.find { it.uri.toString() == pi.videoUriString } }
-                                val vid = allVideos.find { it.uri.toString() == item.videoUriString }
-                                if (vid != null) {
-                                    playbackManager.playVideo(vid, 0L, if (playlistVideos.isNotEmpty()) playlistVideos else listOf(vid))
-                                } else {
-                                    playbackManager.playUri(Uri.parse(item.videoUriString), item.videoTitle)
-                                }
-                                currentScreen = CurrentScreen.PLAYER
-                            },
-                            onPlayAll = {
-                                if (playlistItems.isNotEmpty()) {
-                                    val playlistVideos = playlistItems.mapNotNull { pi -> allVideos.find { it.uri.toString() == pi.videoUriString } }
-                                    val first = playlistVideos.firstOrNull() ?: allVideos.find { it.uri.toString() == playlistItems.first().videoUriString }
-                                    if (first != null) {
-                                        playbackManager.playVideo(first, 0L, playlistVideos)
-                                    } else {
-                                        playbackManager.playUri(Uri.parse(playlistItems.first().videoUriString), playlistItems.first().videoTitle)
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        Box(modifier = Modifier.weight(1f)) {
+                            if (selectedPlaylist != null) {
+                                ScreenPlaylistDetails(
+                                    playlist = selectedPlaylist!!,
+                                    items = playlistItems,
+                                    allVideos = allVideos,
+                                    autoOpenAddVideos = autoOpenAddVideosForPlaylist,
+                                    onBackClick = {
+                                        autoOpenAddVideosForPlaylist = false
+                                        currentScreen = CurrentScreen.PLAYLISTS
+                                    },
+                                    onPlayItem = { item ->
+                                        val playlistVideos = playlistItems.mapNotNull { pi -> allVideos.find { it.uri.toString() == pi.videoUriString } }
+                                        val vid = allVideos.find { it.uri.toString() == item.videoUriString }
+                                        if (vid != null) {
+                                            playbackManager.playVideo(vid, 0L, if (playlistVideos.isNotEmpty()) playlistVideos else listOf(vid))
+                                        } else {
+                                            playbackManager.playUri(Uri.parse(item.videoUriString), item.videoTitle)
+                                        }
+                                        currentScreen = CurrentScreen.PLAYER
+                                    },
+                                    onPlayAll = {
+                                        if (playlistItems.isNotEmpty()) {
+                                            val playlistVideos = playlistItems.mapNotNull { pi -> allVideos.find { it.uri.toString() == pi.videoUriString } }
+                                            val first = playlistVideos.firstOrNull() ?: allVideos.find { it.uri.toString() == playlistItems.first().videoUriString }
+                                            if (first != null) {
+                                                playbackManager.playVideo(first, 0L, playlistVideos)
+                                            } else {
+                                                playbackManager.playUri(Uri.parse(playlistItems.first().videoUriString), playlistItems.first().videoTitle)
+                                            }
+                                            currentScreen = CurrentScreen.PLAYER
+                                        }
+                                    },
+                                    onShuffle = {
+                                        if (playlistItems.isNotEmpty()) {
+                                            val playlistVideos = playlistItems.mapNotNull { pi -> allVideos.find { it.uri.toString() == pi.videoUriString } }.shuffled()
+                                            val first = playlistVideos.firstOrNull() ?: allVideos.find { it.uri.toString() == playlistItems.first().videoUriString }
+                                            if (first != null) {
+                                                playbackManager.playVideo(first, 0L, playlistVideos)
+                                            } else {
+                                                playbackManager.playUri(Uri.parse(playlistItems.first().videoUriString), playlistItems.first().videoTitle)
+                                            }
+                                            currentScreen = CurrentScreen.PLAYER
+                                        }
+                                    },
+                                    onAddVideos = { videosToAdd ->
+                                        playlistViewModel.addMultipleVideosToPlaylist(selectedPlaylist!!.id, videosToAdd)
+                                    },
+                                    onRemoveItem = { item ->
+                                        playlistViewModel.removeVideoFromPlaylist(selectedPlaylist!!.id, item.videoUriString)
+                                    },
+                                    onDeletePlaylist = {
+                                        playlistViewModel.deletePlaylist(selectedPlaylist!!.id)
+                                        currentScreen = CurrentScreen.PLAYLISTS
                                     }
-                                    currentScreen = CurrentScreen.PLAYER
-                                }
-                            },
-                            onShuffle = {
-                                if (playlistItems.isNotEmpty()) {
-                                    val playlistVideos = playlistItems.mapNotNull { pi -> allVideos.find { it.uri.toString() == pi.videoUriString } }.shuffled()
-                                    val first = playlistVideos.firstOrNull() ?: allVideos.find { it.uri.toString() == playlistItems.first().videoUriString }
-                                    if (first != null) {
-                                        playbackManager.playVideo(first, 0L, playlistVideos)
-                                    } else {
-                                        playbackManager.playUri(Uri.parse(playlistItems.first().videoUriString), playlistItems.first().videoTitle)
-                                    }
-                                    currentScreen = CurrentScreen.PLAYER
-                                }
-                            },
-                            onAddVideos = { videosToAdd ->
-                                playlistViewModel.addMultipleVideosToPlaylist(selectedPlaylist!!.id, videosToAdd)
-                            },
-                            onRemoveItem = { item ->
-                                playlistViewModel.removeVideoFromPlaylist(selectedPlaylist!!.id, item.videoUriString)
-                            },
-                            onDeletePlaylist = {
-                                playlistViewModel.deletePlaylist(selectedPlaylist!!.id)
-                                currentScreen = CurrentScreen.PLAYLISTS
+                                )
                             }
-                        )
+                        }
+                        if (curPlayingVideo != null) {
+                            MiniPlayerBar(
+                                playbackManager = playbackManager,
+                                onExpandPlayer = { currentScreen = CurrentScreen.PLAYER }
+                            )
+                        }
                     }
                 }
 
@@ -732,6 +790,18 @@ fun MainApp(
                     onOpenSleepTimer = {
                         showPlayerOptionsSheet = false
                         showSleepTimerDialog = true
+                    },
+                    onOpenEqualizer = {
+                        showPlayerOptionsSheet = false
+                        showEqualizerDialog = true
+                    },
+                    onOpenDecoder = {
+                        showPlayerOptionsSheet = false
+                        showDecoderDialog = true
+                    },
+                    onOpenQuality = {
+                        showPlayerOptionsSheet = false
+                        showQualityDialog = true
                     }
                 )
             }
@@ -770,6 +840,10 @@ fun MainApp(
                     },
                     onAddToPlaylist = {
                         showAddToPlaylistDialog = true
+                    },
+                    onMoveToPrivate = {
+                        libraryViewModel.moveToPrivateFolder(video)
+                        Toast.makeText(context, "Moved to Private Vault", Toast.LENGTH_SHORT).show()
                     },
                     onRename = {
                         showRenameDialog = true
@@ -892,8 +966,36 @@ fun MainApp(
             if (showThemeDialog) {
                 DialogThemeSelection(
                     currentTheme = themeMode,
+                    currentColorTheme = appColorTheme,
                     onDismiss = { showThemeDialog = false },
-                    onSelectTheme = { settingsViewModel.setThemeMode(it) }
+                    onSelectTheme = { mode, color ->
+                        settingsViewModel.setThemeMode(mode)
+                        settingsViewModel.setAppColorTheme(color)
+                    }
+                )
+            }
+
+            if (showEqualizerDialog) {
+                DialogEqualizer(
+                    equalizerController = playbackManager.equalizerController,
+                    onDismiss = { showEqualizerDialog = false }
+                )
+            }
+
+            if (showDecoderDialog) {
+                DialogDecoderSelector(
+                    currentMode = playbackManager.decoderMode.collectAsState().value,
+                    onDismiss = { showDecoderDialog = false },
+                    onApplyDecoder = { mode -> playbackManager.setDecoderMode(mode) }
+                )
+            }
+
+            if (showQualityDialog) {
+                val qualityTracks by playbackManager.videoQualityTracks.collectAsState()
+                DialogVideoQualitySelector(
+                    qualityTracks = qualityTracks,
+                    onDismiss = { showQualityDialog = false },
+                    onSelectQuality = { track -> playbackManager.selectVideoQualityTrack(track) }
                 )
             }
         }

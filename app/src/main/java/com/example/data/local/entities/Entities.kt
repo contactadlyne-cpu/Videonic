@@ -67,3 +67,16 @@ data class RecycleBinEntity(
     val durationMs: Long,
     val mimeType: String
 )
+
+@Entity(tableName = "private_videos")
+data class PrivateVideoEntity(
+    @PrimaryKey
+    val uriString: String,
+    val title: String,
+    val durationMs: Long,
+    val sizeBytes: Long,
+    val dateAdded: Long = System.currentTimeMillis(),
+    val mimeType: String = "video/*",
+    val width: Int = 0,
+    val height: Int = 0
+)

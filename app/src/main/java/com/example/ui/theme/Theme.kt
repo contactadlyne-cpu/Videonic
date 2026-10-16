@@ -44,9 +44,21 @@ private val LightColorScheme = lightColorScheme(
 @Composable
 fun VideonicLiteTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
+    appColorTheme: com.example.data.preferences.AppColorTheme = com.example.data.preferences.AppColorTheme.BLUE,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+    val primaryColor = Color(appColorTheme.primaryColorHex)
+    val colorScheme = if (darkTheme) {
+        DarkColorScheme.copy(
+            primary = primaryColor,
+            secondary = primaryColor.copy(alpha = 0.8f)
+        )
+    } else {
+        LightColorScheme.copy(
+            primary = primaryColor,
+            secondary = primaryColor.copy(alpha = 0.85f)
+        )
+    }
 
     MaterialTheme(
         colorScheme = colorScheme,

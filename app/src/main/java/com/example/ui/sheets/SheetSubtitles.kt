@@ -57,7 +57,7 @@ fun SheetSubtitles(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
         if (uri != null) {
-            // Media3 supports subtitle configurations
+            playbackManager.loadExternalSubtitle(uri, uri.lastPathSegment ?: "External Subtitle")
         }
     }
 

@@ -16,9 +16,10 @@ import com.example.data.local.entities.WatchHistoryEntity
         FavoriteEntity::class,
         PlaylistEntity::class,
         PlaylistItemEntity::class,
-        com.example.data.local.entities.RecycleBinEntity::class
+        com.example.data.local.entities.RecycleBinEntity::class,
+        com.example.data.local.entities.PrivateVideoEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
