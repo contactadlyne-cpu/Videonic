@@ -10,7 +10,10 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
@@ -251,11 +254,14 @@ fun ScreenVideoPlayer(
                         val distance = hypot(dx.toDouble(), dy.toDouble()).toFloat()
                         val elapsed = System.currentTimeMillis() - downTime
 
-                        // 1. Long-press detection (>300ms without vertical dragging) -> Press & Hold dynamic speed!
+
+
+                        // 1. Fast Long-press detection (>120ms) -> Immediate Press & Hold Speed Control!
                         if (dragMode == PlayerDragMode.NONE) {
-                            if (elapsed > 300 && abs(dy) < 30f && !isSpeedBoostTriggered) {
+                            if (elapsed > 120 && abs(dy) < 30f && !isSpeedBoostTriggered) {
                                 isSpeedBoostTriggered = true
-                                playbackManager.setTemporarySpeedBoost(true, 2.0f)
+                                currentGestureSpeed = if (playbackSpeed < 1.25f) 2.0f else playbackSpeed
+                                playbackManager.setTemporarySpeedBoost(true, currentGestureSpeed)
                             } else if (distance > 24f && !isSpeedBoostTriggered) {
                                 // Direction Lock
                                 if (abs(dy) > abs(dx)) {
@@ -271,16 +277,14 @@ fun ScreenVideoPlayer(
                         // 2. Perform smooth drag based on locked mode
                         if (isSpeedBoostTriggered) {
                             change.consume()
-                            // MX Style slide: Right to increase, Left to decrease
-                            // dx is cumulative change since downPos.x
-                            val sensitivity = 0.002f // adjust for desired speed/sensitivity
-                            val baseSpeed = 2.0f
-                            currentGestureSpeed = (baseSpeed + (dx * sensitivity)).coerceIn(0.25f, 4.0f)
+                            // Horizontal slide: Right to increase, Left to decrease
+                            val sensitivity = 0.003f
+                            currentGestureSpeed = (2.0f + (dx * sensitivity)).coerceIn(0.25f, 4.0f)
                             playbackManager.setTemporarySpeedBoost(true, currentGestureSpeed)
                             gestureState = GestureState(
                                 type = GestureType.SPEED,
-                                valueLabel = "${String.format(Locale.US, "%.1f", currentGestureSpeed)}x Speed",
-                                progress = (currentGestureSpeed - 0.5f) / 3.5f
+                                valueLabel = "${String.format(Locale.US, "%.2f", currentGestureSpeed)}x Speed",
+                                progress = (currentGestureSpeed - 0.25f) / 3.75f
                             )
                         } else {
                             when (dragMode) {
@@ -332,9 +336,15 @@ fun ScreenVideoPlayer(
                         }
                     }
 
-                    // On finger release:
+                    // On finger release: auto-select and leave video at current gesture speed
                     if (isSpeedBoostTriggered) {
+                        playbackManager.setSpeed(currentGestureSpeed)
                         playbackManager.setTemporarySpeedBoost(false)
+                        gestureState = GestureState(
+                            type = GestureType.SPEED,
+                            valueLabel = "${String.format(Locale.US, "%.2f", currentGestureSpeed)}x Speed Selected",
+                            progress = (currentGestureSpeed - 0.25f) / 3.75f
+                        )
                     }
 
                     if (dragMode == PlayerDragMode.SEEK) {
@@ -371,33 +381,101 @@ fun ScreenVideoPlayer(
             modifier = Modifier.fillMaxSize()
         )
 
-        // Speed Boost Floating Pill (MX Player style Press & Hold indicator)
-        if (isSpeedBoostActive) {
-            val boostParams = playbackManager.exoPlayer.playbackParameters
+        // Upper Center Speed Selection Popup (Shows all speeds in upper center side to select or leave at that speed)
+        val availableSpeeds = remember { listOf(0.25f, 0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f, 2.5f, 3.0f, 4.0f) }
+
+        if (isSpeedBoostActive || showSpeedDialog) {
+            val activeSpeed = if (isSpeedBoostActive) {
+                playbackManager.exoPlayer.playbackParameters.speed
+            } else {
+                playbackSpeed
+            }
+
             Box(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .statusBarsPadding()
-                    .padding(top = 18.dp)
+                    .padding(top = 10.dp, start = 12.dp, end = 12.dp)
                     .clip(RoundedCornerShape(20.dp))
-                    .background(Color(0xDD0866E5))
-                    .padding(horizontal = 18.dp, vertical = 8.dp)
+                    .background(Color(0xFA0F172A))
+                    .border(1.5.dp, VideonicPrimary, RoundedCornerShape(20.dp))
+                    .padding(horizontal = 14.dp, vertical = 10.dp)
+                    .testTag("upper_center_speed_popup")
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.Speed,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "${String.format(Locale.US, "%.1f", boostParams.speed)}X SPEED >>",
-                        color = Color.White,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 0.5.sp
-                    )
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Speed,
+                                contentDescription = null,
+                                tint = VideonicPrimary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "PLAYBACK SPEED: ${String.format(Locale.US, "%.2f", activeSpeed)}x",
+                                color = Color.White,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = if (isSpeedBoostActive) "Release to set" else "Tap speed option",
+                                color = Color.White.copy(alpha = 0.7f),
+                                fontSize = 11.sp
+                            )
+                            if (showSpeedDialog) {
+                                Spacer(modifier = Modifier.width(8.dp))
+                                IconButton(
+                                    onClick = { showSpeedDialog = false },
+                                    modifier = Modifier.size(24.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "Close",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        modifier = Modifier
+                            .horizontalScroll(rememberScrollState())
+                            .padding(vertical = 2.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        availableSpeeds.forEach { speedVal ->
+                            val isSelected = abs(activeSpeed - speedVal) < 0.12f
+                            Surface(
+                                shape = RoundedCornerShape(14.dp),
+                                color = if (isSelected) VideonicPrimary else Color(0x33FFFFFF),
+                                border = if (isSelected) null else BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)),
+                                modifier = Modifier.clickable {
+                                    playbackManager.setSpeed(speedVal)
+                                    showSpeedDialog = false
+                                }
+                            ) {
+                                Text(
+                                    text = if (speedVal == 1.0f) "1.0x" else "${speedVal}x",
+                                    color = Color.White,
+                                    fontSize = 12.sp,
+                                    fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Medium,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -898,19 +976,7 @@ fun ScreenVideoPlayer(
             }
         }
 
-        // Popups and Dialogs for Playback Features (Requirements 18 & 19)
-        if (showSpeedDialog) {
-            DialogSpeedSelector(
-                currentSpeed = playbackSpeed,
-                onDismiss = { showSpeedDialog = false },
-                onApplySpeed = { speed ->
-                    playbackManager.setSpeed(speed)
-                },
-                onPreviewSpeed = { previewSpeed ->
-                    playbackManager.exoPlayer.playbackParameters = androidx.media3.common.PlaybackParameters(previewSpeed)
-                }
-            )
-        }
+
 
         if (showDecoderDialog) {
             DialogDecoderSelector(
