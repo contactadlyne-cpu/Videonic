@@ -610,7 +610,7 @@ fun ScreenVideoPlayer(
                         )
                     }
 
-                    // Background Audio Toggle via Music Note Icon
+                    // Background Audio Playback Toggle (Headphones 🎧)
                     val isBgAudioOn by playbackManager.isBackgroundAudioEnabled.collectAsState()
                     IconButton(
                         onClick = {
@@ -621,16 +621,28 @@ fun ScreenVideoPlayer(
                                 android.widget.Toast.LENGTH_SHORT
                             ).show()
                         },
-                        modifier = Modifier.testTag("player_audio_button")
+                        modifier = Modifier.testTag("player_headphones_button")
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Audiotrack,
-                            contentDescription = "Background Audio Toggle",
+                            imageVector = Icons.Default.Headphones,
+                            contentDescription = "Background Audio Playback",
                             tint = if (isBgAudioOn) com.example.ui.theme.VideonicPrimary else Color.White
                         )
                     }
 
-                    // Subtitle Toggle
+                    // Audio Track / Voice Language Selection (Audiotrack 🎵 - Hindi, English, etc.)
+                    IconButton(
+                        onClick = onAudioSubClick,
+                        modifier = Modifier.testTag("player_audio_track_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Audiotrack,
+                            contentDescription = "Audio Track / Voice Language Selection",
+                            tint = Color.White
+                        )
+                    }
+
+                    // Subtitle Toggle (Subtitles 💬)
                     IconButton(
                         onClick = onAudioSubClick,
                         modifier = Modifier.testTag("player_subtitle_button")

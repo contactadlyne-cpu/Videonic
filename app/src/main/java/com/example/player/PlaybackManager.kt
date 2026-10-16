@@ -7,6 +7,7 @@ import android.content.Intent
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.media3.session.MediaSession
+import androidx.media3.session.MediaStyleNotificationHelper
 import android.content.Context
 import android.media.AudioManager
 import android.net.Uri
@@ -104,6 +105,9 @@ startPositionTracker()
 } else {
 stopPositionTracker()
 }
+if (_isBackgroundAudioEnabled.value) {
+updateMediaNotification()
+}
 }
 override fun onPlaybackStateChanged(playbackState: Int) {
 if (playbackState == Player.STATE_READY) {
@@ -146,7 +150,12 @@ updateAvailableTracks(tracks)
 }
 }
 init {
-exoPlayer.addListener(playerListener)
+    exoPlayer.addListener(playerListener)
+    try {
+        mediaSession = MediaSession.Builder(context, exoPlayer).build()
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
 }
 fun playVideo(video: VideoItem, startPositionMs: Long = 0L, playlist: List<VideoItem> = emptyList()) {
 _currentVideo.value = video
@@ -496,73 +505,121 @@ _currentPositionMs.value = exoPlayer.currentPosition.coerceAtLeast(0L)
 }
 }
 fun onPause(isFinishing: Boolean, isInPip: Boolean) {
-if (!isFinishing && !isInPip) {
-exoPlayer.pause()
-}
+    if (!isFinishing && !isInPip && !_isBackgroundAudioEnabled.value) {
+        exoPlayer.pause()
+    } else if (_isBackgroundAudioEnabled.value) {
+        updateMediaNotification()
+    }
 }
 fun release() {
-positionUpdateJob?.cancel()
-sleepTimerJob?.cancel()
-seekDebounceJob?.cancel()
-equalizerController.release()
-exoPlayer.removeListener(playerListener)
-exoPlayer.release()
+    positionUpdateJob?.cancel()
+    sleepTimerJob?.cancel()
+    seekDebounceJob?.cancel()
+    equalizerController.release()
+    exoPlayer.removeListener(playerListener)
+    try {
+        mediaSession?.release()
+        mediaSession = null
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+    exoPlayer.release()
 }
 fun toggleBackgroundAudio(): Boolean {
-val next = !_isBackgroundAudioEnabled.value
-_isBackgroundAudioEnabled.value = next
-if (next) {
-updateMediaNotification()
-} else {
-removeMediaNotification()
-}
-return next
+    val next = !_isBackgroundAudioEnabled.value
+    _isBackgroundAudioEnabled.value = next
+    if (next) {
+        updateMediaNotification()
+    } else {
+        removeMediaNotification()
+    }
+    return next
 }
 fun setBackgroundAudioEnabled(enabled: Boolean) {
-_isBackgroundAudioEnabled.value = enabled
-if (enabled) {
-updateMediaNotification()
-} else {
-removeMediaNotification()
-}
+    _isBackgroundAudioEnabled.value = enabled
+    if (enabled) {
+        updateMediaNotification()
+    } else {
+        removeMediaNotification()
+    }
 }
 fun updateMediaNotification() {
-if (!_isBackgroundAudioEnabled.value) return
-val curVideo = _currentVideo.value ?: return
-val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-val channel = NotificationChannel(
-"videonic_bg_audio",
-"Background Audio Playback",
-NotificationManager.IMPORTANCE_LOW
-).apply {
-description = "Background video audio playback controls"
-setShowBadge(false)
-}
-notificationManager.createNotificationChannel(channel)
-}
-val openAppIntent = Intent(context, com.example.MainActivity::class.java).apply {
-flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-}
-val contentPendingIntent = PendingIntent.getActivity(
-context,
-0,
-openAppIntent,
-PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-)
-val notification = NotificationCompat.Builder(context, "videonic_bg_audio")
-.setSmallIcon(com.example.R.mipmap.ic_launcher)
-.setContentTitle(curVideo.displayName)
-.setContentText(if (_isPlaying.value) "Playing in background" else "Paused in background")
-.setContentIntent(contentPendingIntent)
-.setOngoing(_isPlaying.value)
-.setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-.build()
-try {
-notificationManager.notify(2002, notification)
-} catch (e: Exception) {
-e.printStackTrace()
-}
+    if (!_isBackgroundAudioEnabled.value) return
+    val curVideo = _currentVideo.value ?: return
+    val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        val channel = NotificationChannel(
+            "videonic_bg_audio",
+            "Background Audio Playback",
+            NotificationManager.IMPORTANCE_LOW
+        ).apply {
+            description = "Background video audio playback controls"
+            setShowBadge(false)
+        }
+        notificationManager.createNotificationChannel(channel)
+    }
+
+    val openAppIntent = Intent(context, com.example.MainActivity::class.java).apply {
+        flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+    }
+    val contentPendingIntent = PendingIntent.getActivity(
+        context,
+        0,
+        openAppIntent,
+        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+    )
+
+    val prevIntent = PendingIntent.getBroadcast(
+        context,
+        201,
+        Intent("com.example.ACTION_MEDIA_PREV").setPackage(context.packageName),
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+    val playPauseIntent = PendingIntent.getBroadcast(
+        context,
+        202,
+        Intent("com.example.ACTION_MEDIA_PLAY_PAUSE").setPackage(context.packageName),
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+    val nextIntent = PendingIntent.getBroadcast(
+        context,
+        203,
+        Intent("com.example.ACTION_MEDIA_NEXT").setPackage(context.packageName),
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+    val stopIntent = PendingIntent.getBroadcast(
+        context,
+        204,
+        Intent("com.example.ACTION_MEDIA_STOP").setPackage(context.packageName),
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+
+    val isPlaying = _isPlaying.value
+    val playPauseIcon = if (isPlaying) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play
+    val playPauseTitle = if (isPlaying) "Pause" else "Play"
+
+    val builder = NotificationCompat.Builder(context, "videonic_bg_audio")
+        .setSmallIcon(com.example.R.mipmap.ic_launcher)
+        .setContentTitle(curVideo.displayName)
+        .setContentText(if (isPlaying) "Playing in background" else "Paused in background")
+        .setContentIntent(contentPendingIntent)
+        .setOngoing(isPlaying)
+        .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+        .addAction(android.R.drawable.ic_media_previous, "Previous", prevIntent)
+        .addAction(playPauseIcon, playPauseTitle, playPauseIntent)
+        .addAction(android.R.drawable.ic_media_next, "Next", nextIntent)
+        .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Stop", stopIntent)
+
+    val session = mediaSession
+    if (session != null) {
+        builder.setStyle(MediaStyleNotificationHelper.MediaStyle(session))
+    }
+
+    try {
+        notificationManager.notify(2002, builder.build())
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
 }
 fun removeMediaNotification() {
 val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager

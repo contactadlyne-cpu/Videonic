@@ -35,6 +35,10 @@ class MainActivity : ComponentActivity() {
         const val ACTION_PIP_PREV = "com.example.ACTION_PIP_PREV"
         const val ACTION_PIP_PLAY_PAUSE = "com.example.ACTION_PIP_PLAY_PAUSE"
         const val ACTION_PIP_NEXT = "com.example.ACTION_PIP_NEXT"
+        const val ACTION_MEDIA_PREV = "com.example.ACTION_MEDIA_PREV"
+        const val ACTION_MEDIA_PLAY_PAUSE = "com.example.ACTION_MEDIA_PLAY_PAUSE"
+        const val ACTION_MEDIA_NEXT = "com.example.ACTION_MEDIA_NEXT"
+        const val ACTION_MEDIA_STOP = "com.example.ACTION_MEDIA_STOP"
     }
 
     private lateinit var playbackManager: PlaybackManager
@@ -48,9 +52,16 @@ class MainActivity : ComponentActivity() {
     private val pipReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             when (intent?.action) {
-                ACTION_PIP_PREV -> playbackManager.playPreviousVideo()
-                ACTION_PIP_PLAY_PAUSE -> playbackManager.togglePlayPause()
-                ACTION_PIP_NEXT -> playbackManager.playNextVideo()
+                ACTION_PIP_PREV, ACTION_MEDIA_PREV -> playbackManager.playPreviousVideo()
+                ACTION_PIP_PLAY_PAUSE, ACTION_MEDIA_PLAY_PAUSE -> {
+                    playbackManager.togglePlayPause()
+                    playbackManager.updateMediaNotification()
+                }
+                ACTION_PIP_NEXT, ACTION_MEDIA_NEXT -> playbackManager.playNextVideo()
+                ACTION_MEDIA_STOP -> {
+                    playbackManager.pausePlayback()
+                    playbackManager.removeMediaNotification()
+                }
             }
             updatePipActions()
         }
@@ -72,6 +83,10 @@ class MainActivity : ComponentActivity() {
             addAction(ACTION_PIP_PREV)
             addAction(ACTION_PIP_PLAY_PAUSE)
             addAction(ACTION_PIP_NEXT)
+            addAction(ACTION_MEDIA_PREV)
+            addAction(ACTION_MEDIA_PLAY_PAUSE)
+            addAction(ACTION_MEDIA_NEXT)
+            addAction(ACTION_MEDIA_STOP)
         }
         ContextCompat.registerReceiver(
             this,
@@ -80,6 +95,8 @@ class MainActivity : ComponentActivity() {
             ContextCompat.RECEIVER_NOT_EXPORTED
         )
         isReceiverRegistered = true
+
+        requestNotificationPermission()
 
         // Listen for playback state changes to update PiP controls live
         lifecycleScope.launch {
@@ -223,7 +240,11 @@ class MainActivity : ComponentActivity() {
 
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
-        // If playing video, enter PiP mode when user presses home button
+        if (playbackManager.isBackgroundAudioEnabled.value) {
+            playbackManager.updateMediaNotification()
+            return
+        }
+        // If playing video and background audio disabled, enter PiP mode when user presses home button
         if (playbackManager.isPlaying.value && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             enterPipMode()
         }
@@ -231,7 +252,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onPause() {
         super.onPause()
-        if (!playbackManager.isBackgroundAudioEnabled.value) {
+        if (playbackManager.isBackgroundAudioEnabled.value) {
+            playbackManager.updateMediaNotification()
+        } else {
             playbackManager.onPause(isFinishing, _isInPipMode.value)
         }
     }
