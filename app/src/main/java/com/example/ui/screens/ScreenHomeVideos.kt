@@ -64,6 +64,9 @@ import com.example.data.preferences.VideoSortOrder
 import com.example.data.preferences.ViewLayout
 import com.example.ui.components.VideoThumbnail
 import com.example.ui.theme.VideonicPrimary
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
+import com.example.ui.theme.FavoriteRed
 
 @Composable
 fun ScreenHomeVideos(
@@ -76,6 +79,8 @@ fun ScreenHomeVideos(
     onSortOrderChange: (VideoSortOrder) -> Unit = {},
     onVideoClick: (VideoItem) -> Unit,
     onVideoOptionsClick: (VideoItem) -> Unit,
+    isFavorite: (String) -> Boolean,
+    onToggleFavorite: (VideoItem) -> Unit,
     onPickManualVideo: () -> Unit = {},
     hasLoadedOnce: Boolean = true
 ) {
@@ -178,6 +183,8 @@ fun ScreenHomeVideos(
                         VideoGridCard(
                             video = video,
                             showThumbnails = showThumbnails,
+                            isFavorite = isFavorite,
+                            onToggleFavorite = onToggleFavorite,
                             onClick = { onVideoClick(video) },
                             onOptionsClick = { onVideoOptionsClick(video) }
                         )
@@ -196,6 +203,8 @@ fun ScreenHomeVideos(
                         VideoListRow(
                             video = video,
                             showThumbnails = showThumbnails,
+                            isFavorite = isFavorite,
+                            onToggleFavorite = onToggleFavorite,
                             onClick = { onVideoClick(video) },
                             onOptionsClick = { onVideoOptionsClick(video) }
                         )
@@ -210,6 +219,8 @@ fun ScreenHomeVideos(
 fun VideoGridCard(
     video: VideoItem,
     showThumbnails: Boolean = true,
+    isFavorite: (String) -> Boolean,
+    onToggleFavorite: (VideoItem) -> Unit,
     onClick: () -> Unit,
     onOptionsClick: () -> Unit
 ) {
@@ -286,6 +297,32 @@ fun VideoGridCard(
                 }
 
                 IconButton(
+                    onClick = { onToggleFavorite(video) },
+                    modifier = Modifier
+                        .size(28.dp)
+                        .testTag("video_card_favorite_${video.id}")
+                ) {
+                    Icon(
+                        imageVector = if (isFavorite(video.uri.toString())) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                        contentDescription = "Toggle Favorite",
+                        tint = if (isFavorite(video.uri.toString())) FavoriteRed else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+                IconButton(
+                    onClick = { onToggleFavorite(video) },
+                    modifier = Modifier
+                        .size(28.dp)
+                        .testTag("video_card_favorite_${video.id}")
+                ) {
+                    Icon(
+                        imageVector = if (isFavorite(video.uri.toString())) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                        contentDescription = "Toggle Favorite",
+                        tint = if (isFavorite(video.uri.toString())) FavoriteRed else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+                IconButton(
                     onClick = onOptionsClick,
                     modifier = Modifier
                         .size(28.dp)
@@ -307,6 +344,8 @@ fun VideoGridCard(
 fun VideoListRow(
     video: VideoItem,
     showThumbnails: Boolean = true,
+    isFavorite: (String) -> Boolean,
+    onToggleFavorite: (VideoItem) -> Unit,
     onClick: () -> Unit,
     onOptionsClick: () -> Unit
 ) {
@@ -361,16 +400,6 @@ fun VideoListRow(
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = video.formattedDuration,
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = " • ",
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
                         text = video.formattedSize,
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -389,6 +418,32 @@ fun VideoListRow(
                 }
             }
 
+            IconButton(
+                onClick = { onToggleFavorite(video) },
+                modifier = Modifier
+                    .size(36.dp)
+                    .testTag("video_row_favorite_${video.id}")
+            ) {
+                Icon(
+                    imageVector = if (isFavorite(video.uri.toString())) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                    contentDescription = "Toggle Favorite",
+                    tint = if (isFavorite(video.uri.toString())) FavoriteRed else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            IconButton(
+                onClick = { onToggleFavorite(video) },
+                modifier = Modifier
+                    .size(36.dp)
+                    .testTag("video_row_favorite_${video.id}")
+            ) {
+                Icon(
+                    imageVector = if (isFavorite(video.uri.toString())) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                    contentDescription = "Toggle Favorite",
+                    tint = if (isFavorite(video.uri.toString())) FavoriteRed else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
             IconButton(
                 onClick = onOptionsClick,
                 modifier = Modifier

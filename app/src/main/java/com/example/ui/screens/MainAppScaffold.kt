@@ -43,6 +43,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -196,6 +197,7 @@ fun MainApp(
     // Bottom Sheets & Dialogs State
     var showPlayerOptionsSheet by remember { mutableStateOf(false) }
     var showAudioSubSheet by remember { mutableStateOf(false) }
+    var audioSubSheetTab by remember { mutableIntStateOf(0) }
     var showVideoInfoSheet by remember { mutableStateOf(false) }
     var showVideoActionsSheet by remember { mutableStateOf(false) }
     var showCreatePlaylistDialog by remember { mutableStateOf(false) }
@@ -347,7 +349,7 @@ fun MainApp(
                             }
                             VideonicTopBar(
                                 title = title,
-                                showActions = currentScreen == CurrentScreen.HOME,
+                                showActions = currentScreen == CurrentScreen.HOME && selectedBottomTab != BottomNavTab.ME,
                                 viewLayout = viewLayout,
                                 onSearchClick = { currentScreen = CurrentScreen.SEARCH },
                                 onRefreshClick = { libraryViewModel.loadVideos() },
@@ -414,6 +416,8 @@ fun MainApp(
                                                     selectedVideoForAction = video
                                                     showVideoActionsSheet = true
                                                 },
+                                                isFavorite = { uri -> libraryViewModel.isFavorite(uri) },
+                                                onToggleFavorite = { video -> libraryViewModel.toggleFavorite(video) },
                                                 onPickManualVideo = { videoPickerLauncher.launch(arrayOf("video/*")) },
                                                 hasLoadedOnce = hasLoadedOnce
                                             )
@@ -556,7 +560,9 @@ fun MainApp(
                             onVideoOptionsClick = { video ->
                                 selectedVideoForAction = video
                                 showVideoActionsSheet = true
-                            }
+                            },
+                            isFavorite = { uri -> libraryViewModel.isFavorite(uri) },
+                            onToggleFavorite = { video -> libraryViewModel.toggleFavorite(video) }
                         )
                     }
                 }
@@ -584,7 +590,9 @@ fun MainApp(
                         onVideoOptionsClick = { video ->
                             selectedVideoForAction = video
                             showVideoActionsSheet = true
-                        }
+                        },
+                        isFavorite = { uri -> libraryViewModel.isFavorite(uri) },
+                        onToggleFavorite = { video -> libraryViewModel.toggleFavorite(video) }
                     )
                 }
 
@@ -600,6 +608,7 @@ fun MainApp(
 
                     ScreenVideoPlayer(
                         playbackManager = playbackManager,
+                        autoRotateSetting = settingsViewModel.autoRotateVideo.collectAsState().value,
                         keepScreenOnSetting = keepScreenOn,
                         onBackClick = {
                             val curVideo = playbackManager.currentVideo.value
@@ -610,7 +619,14 @@ fun MainApp(
                             currentScreen = CurrentScreen.HOME
                         },
                         onOptionsClick = { showPlayerOptionsSheet = true },
-                        onAudioSubClick = { showAudioSubSheet = true },
+                        onAudioClick = {
+                            audioSubSheetTab = 0
+                            showAudioSubSheet = true
+                        },
+                        onSubtitleClick = {
+                            audioSubSheetTab = 1
+                            showAudioSubSheet = true
+                        },
                         onSpeedClick = { showPlayerOptionsSheet = true },
                         onAspectClick = {
                             playbackManager.cycleAspectRatio()
@@ -727,7 +743,8 @@ fun MainApp(
             if (showAudioSubSheet) {
                 SheetAudioSubtitles(
                     playbackManager = playbackManager,
-                    onDismiss = { showAudioSubSheet = false }
+                    onDismiss = { showAudioSubSheet = false },
+                    initialTab = audioSubSheetTab
                 )
             }
 

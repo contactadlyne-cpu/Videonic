@@ -128,7 +128,8 @@ fun ScreenVideoPlayer(
     keepScreenOnSetting: Boolean = true,
     onBackClick: () -> Unit,
     onOptionsClick: () -> Unit,
-    onAudioSubClick: () -> Unit,
+    onAudioClick: () -> Unit,
+    onSubtitleClick: () -> Unit,
     onSpeedClick: () -> Unit,
     onAspectClick: () -> Unit,
     onPlaylistClick: () -> Unit,
@@ -159,9 +160,9 @@ fun ScreenVideoPlayer(
     var showDecoderDialog by remember { mutableStateOf(false) }
     var showEqualizerDialog by remember { mutableStateOf(false) }
 
-    // Manage Activity Orientation: default to Portrait (Auto Rotate OFF)
-    LaunchedEffect(Unit) {
-        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+    // Manage Activity Orientation based on setting
+    LaunchedEffect(autoRotateSetting) {
+        activity?.requestedOrientation = if (autoRotateSetting) ActivityInfo.SCREEN_ORIENTATION_SENSOR else ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
     }
 
     // Make controls visible immediately when video ends so Replay icon is displayed
@@ -286,7 +287,7 @@ fun ScreenVideoPlayer(
                         if (isSpeedBoostTriggered) {
                             change.consume()
                             // Horizontal slide: Right to increase, Left to decrease
-                            val sensitivity = 0.003f
+                            val sensitivity = 0.01f
                             currentGestureSpeed = (2.0f + (dx * sensitivity)).coerceIn(0.25f, 4.0f)
                             playbackManager.setTemporarySpeedBoost(true, currentGestureSpeed)
                             gestureState = GestureState(
@@ -390,9 +391,16 @@ fun ScreenVideoPlayer(
         )
 
         // Small Compact Upper Center Speed Selection Popup
-        val availableSpeeds = remember { listOf(0.25f, 0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f, 2.5f, 3.0f, 4.0f) }
+        val availableSpeeds = remember { listOf(0.5f, 1.0f, 2.0f, 4.0f) }
 
         if (isSpeedBoostActive || showSpeedDialog) {
+            // Auto-close after 5 seconds if speed dialog is open
+            LaunchedEffect(showSpeedDialog) {
+                if (showSpeedDialog) {
+                    delay(5000)
+                    showSpeedDialog = false
+                }
+            }
             val activeSpeed = if (isSpeedBoostActive) {
                 playbackManager.exoPlayer.playbackParameters.speed
             } else {
@@ -400,10 +408,10 @@ fun ScreenVideoPlayer(
             }
 
             Surface(
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(12.dp),
                 color = Color(0xF00F172A),
                 border = BorderStroke(1.dp, VideonicPrimary.copy(alpha = 0.8f)),
-                shadowElevation = 6.dp,
+                shadowElevation = 4.dp,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .statusBarsPadding()
@@ -412,68 +420,67 @@ fun ScreenVideoPlayer(
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Speed,
                         contentDescription = null,
                         tint = VideonicPrimary,
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(14.dp)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = "${String.format(Locale.US, "%.2f", activeSpeed)}x",
+                        text = "${String.format(Locale.US, "%.1f", activeSpeed)}x",
                         color = Color.White,
-                        fontSize = 12.sp,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Bold
                     )
 
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
                     Box(
                         modifier = Modifier
                             .width(1.dp)
-                            .height(16.dp)
+                            .height(12.dp)
                             .background(Color.White.copy(alpha = 0.2f))
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
 
                     Row(
-                        modifier = Modifier.horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         availableSpeeds.forEach { speedVal ->
-                            val isSelected = abs(activeSpeed - speedVal) < 0.12f
+                            val isSelected = abs(activeSpeed - speedVal) < 0.1f
                             Surface(
-                                shape = RoundedCornerShape(10.dp),
+                                shape = RoundedCornerShape(8.dp),
                                 color = if (isSelected) VideonicPrimary else Color(0x22FFFFFF),
                                 modifier = Modifier.clickable {
                                     playbackManager.setSpeed(speedVal)
-                                    showSpeedDialog = false
+                                    // Keep open if user is actively interacting
                                 }
                             ) {
                                 Text(
-                                    text = if (speedVal == 1.0f) "1x" else "${speedVal}x",
+                                    text = "${speedVal}x",
                                     color = Color.White,
-                                    fontSize = 11.sp,
-                                    fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Normal,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                                    fontSize = 10.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                 )
                             }
                         }
                     }
 
                     if (showSpeedDialog) {
-                        Spacer(modifier = Modifier.width(6.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
                         IconButton(
                             onClick = { showSpeedDialog = false },
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(16.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Close,
                                 contentDescription = "Close",
                                 tint = Color.White.copy(alpha = 0.8f),
-                                modifier = Modifier.size(14.dp)
+                                modifier = Modifier.size(12.dp)
                             )
                         }
                     }
@@ -631,26 +638,26 @@ fun ScreenVideoPlayer(
                         )
                     }
 
-                    // Audio Track / Voice Language Selection (Audiotrack 🎵 - Hindi, English, etc.)
+                    // Audio Track / Voice Language Selection
                     IconButton(
-                        onClick = onAudioSubClick,
+                        onClick = onAudioClick,
                         modifier = Modifier.testTag("player_audio_track_button")
                     ) {
                         Icon(
                             imageVector = Icons.Default.Audiotrack,
-                            contentDescription = "Audio Track / Voice Language Selection",
+                            contentDescription = "Audio Track Selection",
                             tint = Color.White
                         )
                     }
 
-                    // Subtitle Toggle (Subtitles 💬)
+                    // Subtitle Toggle
                     IconButton(
-                        onClick = onAudioSubClick,
+                        onClick = onSubtitleClick,
                         modifier = Modifier.testTag("player_subtitle_button")
                     ) {
                         Icon(
                             imageVector = Icons.Default.Subtitles,
-                            contentDescription = "Subtitles",
+                            contentDescription = "Subtitle Selection",
                             tint = Color.White
                         )
                     }
@@ -871,9 +878,9 @@ fun ScreenVideoPlayer(
                                 .padding(horizontal = 8.dp)
                                 .testTag("player_seekbar"),
                             colors = SliderDefaults.colors(
-                                thumbColor = Color.White,
+                                thumbColor = Color.White, // More visible thumb
                                 activeTrackColor = VideonicPrimary,
-                                inactiveTrackColor = Color(0x66FFFFFF)
+                                inactiveTrackColor = Color.White.copy(alpha = 0.2f)
                             )
                         )
 

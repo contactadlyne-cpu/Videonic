@@ -194,7 +194,9 @@ fun ScreenFolderDetails(
     onViewLayoutChange: (ViewLayout) -> Unit,
     onSortOrderChange: (VideoSortOrder) -> Unit,
     onVideoClick: (VideoItem) -> Unit,
-    onVideoOptionsClick: (VideoItem) -> Unit
+    onVideoOptionsClick: (VideoItem) -> Unit,
+    isFavorite: (String) -> Boolean,
+    onToggleFavorite: (VideoItem) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -251,6 +253,8 @@ fun ScreenFolderDetails(
                 onViewLayoutChange = onViewLayoutChange,
                 onVideoClick = onVideoClick,
                 onVideoOptionsClick = onVideoOptionsClick,
+                isFavorite = isFavorite,
+                onToggleFavorite = onToggleFavorite,
                 hasLoadedOnce = true
             )
         }

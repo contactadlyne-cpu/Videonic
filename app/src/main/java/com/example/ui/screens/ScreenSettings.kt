@@ -113,14 +113,31 @@ fun ScreenSettings(
                 onClick = onOpenThemeDialog
             )
 
+            var showViewLayoutDialog by remember { mutableStateOf(false) }
             SettingsNavRow(
                 icon = Icons.Default.GridView,
                 title = "Default View",
                 subtitle = if (viewLayout == ViewLayout.GRID) "Grid" else "List",
-                onClick = {
-                    viewModel.setViewLayout(if (viewLayout == ViewLayout.GRID) ViewLayout.LIST else ViewLayout.GRID)
-                }
+                onClick = { showViewLayoutDialog = true }
             )
+
+            if (showViewLayoutDialog) {
+                AlertDialog(
+                    onDismissRequest = { showViewLayoutDialog = false },
+                    title = { Text("Default View") },
+                    text = {
+                        Column {
+                            TextButton(onClick = { viewModel.setViewLayout(ViewLayout.LIST); showViewLayoutDialog = false }) {
+                                Text("List View")
+                            }
+                            TextButton(onClick = { viewModel.setViewLayout(ViewLayout.GRID); showViewLayoutDialog = false }) {
+                                Text("Grid View")
+                            }
+                        }
+                    },
+                    confirmButton = { TextButton(onClick = { showViewLayoutDialog = false }) { Text("Cancel") } }
+                )
+            }
 
             SettingsToggleRow(
                 icon = Icons.Default.Image,
@@ -148,22 +165,36 @@ fun ScreenSettings(
                 onCheckedChange = { viewModel.setAutoPlayNext(it) }
             )
 
-
-
+            var showSpeedDialog by remember { mutableStateOf(false) }
             SettingsNavRow(
                 icon = Icons.Default.Speed,
                 title = "Default Playback Speed",
                 subtitle = "${defaultSpeed}x",
-                onClick = {
-                    val nextSpeed = when (defaultSpeed) {
-                        1.0f -> 1.25f
-                        1.25f -> 1.5f
-                        1.5f -> 2.0f
-                        2.0f -> 0.75f
-                        else -> 1.0f
-                    }
-                    viewModel.setDefaultSpeed(nextSpeed)
-                }
+                onClick = { showSpeedDialog = true }
+            )
+
+            if (showSpeedDialog) {
+                AlertDialog(
+                    onDismissRequest = { showSpeedDialog = false },
+                    title = { Text("Default Speed") },
+                    text = {
+                        Column {
+                            listOf(0.5f, 1.0f, 2.0f, 4.0f).forEach { speed ->
+                                TextButton(onClick = { viewModel.setDefaultSpeed(speed); showSpeedDialog = false }) {
+                                    Text("${speed}x")
+                                }
+                            }
+                        }
+                    },
+                    confirmButton = { TextButton(onClick = { showSpeedDialog = false }) { Text("Cancel") } }
+                )
+            }
+
+            SettingsToggleRow(
+                icon = Icons.Default.BrightnessAuto,
+                title = "Auto Rotate while Playing",
+                checked = autoRotateVideo,
+                onCheckedChange = { viewModel.setAutoRotateVideo(it) }
             )
 
             SettingsToggleRow(

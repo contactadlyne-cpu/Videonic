@@ -1,6 +1,7 @@
 package com.example.ui.dialogs
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -151,10 +152,11 @@ fun DialogEqualizer(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
-                        .padding(10.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(MaterialTheme.colorScheme.surface)
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(16.dp))
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     for (i in 0 until 5) {
                         val levelMb = bandLevels.getOrElse(i) { 0 }
@@ -166,8 +168,8 @@ fun DialogEqualizer(
                         ) {
                             Text(
                                 text = frequencies.getOrElse(i) { "Band $i" },
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
                                 modifier = Modifier.width(54.dp),
                                 color = if (isEnabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline
                             )
@@ -178,20 +180,21 @@ fun DialogEqualizer(
                                     equalizerController.setBandLevel(i, frac.toInt())
                                 },
                                 valueRange = -1500f..1500f,
-                                steps = 30,
                                 enabled = isEnabled,
                                 modifier = Modifier
                                     .weight(1f)
+                                    .padding(horizontal = 8.dp)
                                     .testTag("eq_band_slider_$i"),
                                 colors = SliderDefaults.colors(
                                     thumbColor = VideonicPrimary,
-                                    activeTrackColor = VideonicPrimary
+                                    activeTrackColor = VideonicPrimary,
+                                    inactiveTrackColor = MaterialTheme.colorScheme.outlineVariant
                                 )
                             )
 
                             Text(
                                 text = "${if (levelDb > 0) "+$levelDb" else "$levelDb"} dB",
-                                fontSize = 11.sp,
+                                fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.width(42.dp),
                                 color = if (isEnabled) VideonicPrimary else MaterialTheme.colorScheme.outline

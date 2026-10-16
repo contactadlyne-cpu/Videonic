@@ -48,7 +48,9 @@ fun ScreenSearch(
     results: List<VideoItem>,
     onBackClick: () -> Unit,
     onVideoClick: (VideoItem) -> Unit,
-    onVideoOptionsClick: (VideoItem) -> Unit
+    onVideoOptionsClick: (VideoItem) -> Unit,
+    isFavorite: (String) -> Boolean,
+    onToggleFavorite: (VideoItem) -> Unit
 ) {
     val focusRequester = remember { FocusRequester() }
 
@@ -145,6 +147,8 @@ fun ScreenSearch(
                 items(results, key = { it.uri.toString() }) { video ->
                     VideoListRow(
                         video = video,
+                        isFavorite = { _ -> false }, // Simplified for Search
+                        onToggleFavorite = { _ -> },
                         onClick = { onVideoClick(video) },
                         onOptionsClick = { onVideoOptionsClick(video) }
                     )

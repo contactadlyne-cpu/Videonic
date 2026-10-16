@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "Videonic Lite"
+rootProject.name = "Videonic"
 
 include(":app")

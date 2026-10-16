@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Videonic Lite</string>
+    <string name="app_name">Videonic Player</string>
     <string name="app_subtitle">Video Player</string>
     <string name="tab_videos">Videos</string>
     <string name="tab_folders">Folders</string>

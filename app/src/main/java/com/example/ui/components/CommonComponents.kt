@@ -281,7 +281,7 @@ fun VideoThumbnail(
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(8.dp))
-            .background(Color(0xFF1E293B)),
+            .background(MaterialTheme.colorScheme.surfaceVariant),
         contentAlignment = Alignment.Center
     ) {
         if (showThumbnailImage && imageRequest != null) {

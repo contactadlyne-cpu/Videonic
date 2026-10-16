@@ -52,10 +52,11 @@ import com.example.ui.theme.VideonicPrimary
 @Composable
 fun SheetAudioSubtitles(
     playbackManager: PlaybackManager,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    initialTab: Int = 0
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var selectedTab by remember { mutableIntStateOf(0) }
+    var selectedTab by remember { mutableIntStateOf(initialTab) }
 
     val audioTracks by playbackManager.audioTracks.collectAsState()
     val subtitleTracks by playbackManager.subtitleTracks.collectAsState()
