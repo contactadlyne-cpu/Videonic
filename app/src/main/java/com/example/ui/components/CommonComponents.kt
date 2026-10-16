@@ -162,18 +162,40 @@ fun VideonicTopBar(
                         )
                     }
                 }
-                IconButton(
-                    onClick = {
-                        val next = if (viewLayout == ViewLayout.GRID) ViewLayout.LIST else ViewLayout.GRID
-                        onViewLayoutChange(next)
-                    },
-                    modifier = Modifier.testTag("top_toggle_view_button")
-                ) {
-                    Icon(
-                        imageVector = if (viewLayout == ViewLayout.GRID) Icons.Default.ViewList else Icons.Default.GridView,
-                        contentDescription = if (viewLayout == ViewLayout.GRID) "Switch to List View" else "Switch to Grid View",
-                        tint = MaterialTheme.colorScheme.onBackground
-                    )
+                var showViewMenu by remember { mutableStateOf(false) }
+                Box {
+                    IconButton(
+                        onClick = { showViewMenu = true },
+                        modifier = Modifier.testTag("top_toggle_view_button")
+                    ) {
+                        Icon(
+                            imageVector = if (viewLayout == ViewLayout.GRID) Icons.Default.GridView else Icons.Default.ViewList,
+                            contentDescription = "View Options",
+                            tint = MaterialTheme.colorScheme.onBackground
+                        )
+                    }
+
+                    DropdownMenu(
+                        expanded = showViewMenu,
+                        onDismissRequest = { showViewMenu = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("List View") },
+                            leadingIcon = { Icon(Icons.Default.ViewList, contentDescription = null) },
+                            onClick = {
+                                onViewLayoutChange(ViewLayout.LIST)
+                                showViewMenu = false
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Grid View") },
+                            leadingIcon = { Icon(Icons.Default.GridView, contentDescription = null) },
+                            onClick = {
+                                onViewLayoutChange(ViewLayout.GRID)
+                                showViewMenu = false
+                            }
+                        )
+                    }
                 }
             }
         },

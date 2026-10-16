@@ -185,6 +185,8 @@ _autoResumedFromMs.value = startPositionMs
 _autoResumedFromMs.value = null
 }
 val mediaItem = MediaItem.fromUri(video.uri)
+_playbackSpeed.value = 1.0f
+exoPlayer.playbackParameters = PlaybackParameters(1.0f)
 exoPlayer.stop()
 exoPlayer.clearMediaItems()
 exoPlayer.setMediaItem(mediaItem)

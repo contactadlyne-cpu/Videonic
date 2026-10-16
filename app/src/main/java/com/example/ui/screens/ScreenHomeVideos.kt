@@ -18,10 +18,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Sort
@@ -76,22 +79,29 @@ fun ScreenHomeVideos(
     onPickManualVideo: () -> Unit = {},
     hasLoadedOnce: Boolean = true
 ) {
+    val listState = rememberLazyListState()
+    val gridState = rememberLazyGridState()
+
+    // Reset scroll position to top whenever sort order changes so the list does not jump down!
+    LaunchedEffect(sortOrder) {
+        listState.scrollToItem(0)
+        gridState.scrollToItem(0)
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .testTag("screen_home_videos")
             .background(MaterialTheme.colorScheme.background)
     ) {
-
-
-        if (isLoading) {
+        if (isLoading || !hasLoadedOnce) {
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
                 CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
             }
-        } else if (videos.isEmpty() && hasLoadedOnce) {
+        } else if (videos.isEmpty()) {
             // Screen 9 / Empty State
             Box(
                 modifier = Modifier
@@ -155,6 +165,7 @@ fun ScreenHomeVideos(
             // Render Grid or List
             if (viewLayout == ViewLayout.GRID) {
                 LazyVerticalGrid(
+                    state = gridState,
                     columns = GridCells.Adaptive(minSize = 160.dp),
                     contentPadding = PaddingValues(12.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -174,6 +185,7 @@ fun ScreenHomeVideos(
                 }
             } else {
                 LazyColumn(
+                    state = listState,
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier

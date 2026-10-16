@@ -178,11 +178,18 @@ fun MainApp(
         }
     }
 
-    // Remove double splash screen: transitions directly to Home or Permission primer
+    // Single splash screen: native system splash transitions directly to Home or Permission primer
     var currentScreen by rememberSaveable {
-        mutableStateOf(CurrentScreen.SPLASH)
+        mutableStateOf(if (hasVideoPermission) CurrentScreen.HOME else CurrentScreen.PERMISSION_PRIMER)
     }
     var selectedBottomTab by remember { mutableStateOf(BottomNavTab.VIDEOS) }
+
+    // Always reset orientation to Portrait when not on video player screen
+    LaunchedEffect(currentScreen) {
+        if (currentScreen != CurrentScreen.PLAYER) {
+            (context as? Activity)?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        }
+    }
 
     var lastBackPressTime by remember { mutableLongStateOf(0L) }
 

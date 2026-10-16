@@ -202,13 +202,14 @@ fun ScreenVideoPlayer(
         }
     }
 
-    // Keep screen on during playback if setting is enabled
+    // Keep screen on during playback & restore portrait orientation when leaving player
     DisposableEffect(keepScreenOnSetting) {
         if (keepScreenOnSetting) {
             activity?.window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         }
         onDispose {
             activity?.window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         }
     }
 
@@ -381,7 +382,7 @@ fun ScreenVideoPlayer(
             modifier = Modifier.fillMaxSize()
         )
 
-        // Upper Center Speed Selection Popup (Shows all speeds in upper center side to select or leave at that speed)
+        // Small Compact Upper Center Speed Selection Popup
         val availableSpeeds = remember { listOf(0.25f, 0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f, 2.5f, 3.0f, 4.0f) }
 
         if (isSpeedBoostActive || showSpeedDialog) {
@@ -391,89 +392,82 @@ fun ScreenVideoPlayer(
                 playbackSpeed
             }
 
-            Box(
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = Color(0xF00F172A),
+                border = BorderStroke(1.dp, VideonicPrimary.copy(alpha = 0.8f)),
+                shadowElevation = 6.dp,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .statusBarsPadding()
-                    .padding(top = 10.dp, start = 12.dp, end = 12.dp)
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(Color(0xFA0F172A))
-                    .border(1.5.dp, VideonicPrimary, RoundedCornerShape(20.dp))
-                    .padding(horizontal = 14.dp, vertical = 10.dp)
+                    .padding(top = 8.dp)
                     .testTag("upper_center_speed_popup")
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.Speed,
-                                contentDescription = null,
-                                tint = VideonicPrimary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "PLAYBACK SPEED: ${String.format(Locale.US, "%.2f", activeSpeed)}x",
-                                color = Color.White,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Speed,
+                        contentDescription = null,
+                        tint = VideonicPrimary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "${String.format(Locale.US, "%.2f", activeSpeed)}x",
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
 
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = if (isSpeedBoostActive) "Release to set" else "Tap speed option",
-                                color = Color.White.copy(alpha = 0.7f),
-                                fontSize = 11.sp
-                            )
-                            if (showSpeedDialog) {
-                                Spacer(modifier = Modifier.width(8.dp))
-                                IconButton(
-                                    onClick = { showSpeedDialog = false },
-                                    modifier = Modifier.size(24.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Close,
-                                        contentDescription = "Close",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Row(
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Box(
                         modifier = Modifier
-                            .horizontalScroll(rememberScrollState())
-                            .padding(vertical = 2.dp),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            .width(1.dp)
+                            .height(16.dp)
+                            .background(Color.White.copy(alpha = 0.2f))
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    Row(
+                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         availableSpeeds.forEach { speedVal ->
                             val isSelected = abs(activeSpeed - speedVal) < 0.12f
                             Surface(
-                                shape = RoundedCornerShape(14.dp),
-                                color = if (isSelected) VideonicPrimary else Color(0x33FFFFFF),
-                                border = if (isSelected) null else BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)),
+                                shape = RoundedCornerShape(10.dp),
+                                color = if (isSelected) VideonicPrimary else Color(0x22FFFFFF),
                                 modifier = Modifier.clickable {
                                     playbackManager.setSpeed(speedVal)
                                     showSpeedDialog = false
                                 }
                             ) {
                                 Text(
-                                    text = if (speedVal == 1.0f) "1.0x" else "${speedVal}x",
+                                    text = if (speedVal == 1.0f) "1x" else "${speedVal}x",
                                     color = Color.White,
-                                    fontSize = 12.sp,
-                                    fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Medium,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                    fontSize = 11.sp,
+                                    fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Normal,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
                                 )
                             }
+                        }
+                    }
+
+                    if (showSpeedDialog) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        IconButton(
+                            onClick = { showSpeedDialog = false },
+                            modifier = Modifier.size(20.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Close",
+                                tint = Color.White.copy(alpha = 0.8f),
+                                modifier = Modifier.size(14.dp)
+                            )
                         }
                     }
                 }
