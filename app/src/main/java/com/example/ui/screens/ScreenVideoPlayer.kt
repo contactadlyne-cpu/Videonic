@@ -188,8 +188,8 @@ fun ScreenVideoPlayer(
     }
 
     // Auto-hide controls timer (4s)
-    LaunchedEffect(areControlsVisible, isPlaying, isDraggingSlider, isSpeedBoostActive) {
-        if (areControlsVisible && isPlaying && !isDraggingSlider && !isSpeedBoostActive) {
+    LaunchedEffect(areControlsVisible, isPlaying, isDraggingSlider, isSpeedBoostActive, showSpeedDialog, showDecoderDialog, showEqualizerDialog) {
+        if (areControlsVisible && isPlaying && !isDraggingSlider && !isSpeedBoostActive && !showSpeedDialog && !showDecoderDialog && !showEqualizerDialog) {
             delay(4000)
             areControlsVisible = false
         }
@@ -394,96 +394,46 @@ fun ScreenVideoPlayer(
         val availableSpeeds = remember { listOf(0.5f, 1.0f, 2.0f, 4.0f) }
 
         if (isSpeedBoostActive || showSpeedDialog) {
-            // Auto-close after 5 seconds if speed dialog is open
-            LaunchedEffect(showSpeedDialog) {
-                if (showSpeedDialog) {
-                    delay(5000)
-                    showSpeedDialog = false
-                }
-            }
-            val activeSpeed = if (isSpeedBoostActive) {
-                playbackManager.exoPlayer.playbackParameters.speed
-            } else {
-                playbackSpeed
-            }
-
+            val activeSpeed = if (isSpeedBoostActive) playbackManager.exoPlayer.playbackParameters.speed else playbackSpeed
+            
             Surface(
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(24.dp),
                 color = Color(0xF00F172A),
-                border = BorderStroke(1.dp, VideonicPrimary.copy(alpha = 0.8f)),
-                shadowElevation = 4.dp,
+                border = BorderStroke(1.dp, VideonicPrimary.copy(alpha = 0.5f)),
+                shadowElevation = 8.dp,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .statusBarsPadding()
-                    .padding(top = 8.dp)
+                    .padding(top = 16.dp)
+                    .width(320.dp)
                     .testTag("upper_center_speed_popup")
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Speed,
-                        contentDescription = null,
-                        tint = VideonicPrimary,
-                        modifier = Modifier.size(14.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "${String.format(Locale.US, "%.1f", activeSpeed)}x",
-                        color = Color.White,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Box(
-                        modifier = Modifier
-                            .width(1.dp)
-                            .height(12.dp)
-                            .background(Color.White.copy(alpha = 0.2f))
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-
+                Column(modifier = Modifier.padding(12.dp)) {
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        availableSpeeds.forEach { speedVal ->
-                            val isSelected = abs(activeSpeed - speedVal) < 0.1f
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = if (isSelected) VideonicPrimary else Color(0x22FFFFFF),
-                                modifier = Modifier.clickable {
-                                    playbackManager.setSpeed(speedVal)
-                                    // Keep open if user is actively interacting
-                                }
-                            ) {
-                                Text(
-                                    text = "${speedVal}x",
-                                    color = Color.White,
-                                    fontSize = 10.sp,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                )
-                            }
-                        }
+                        Text("0.25x", color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp)
+                        Text("4.0x", color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp)
                     }
-
-                    if (showSpeedDialog) {
-                        Spacer(modifier = Modifier.width(4.dp))
-                        IconButton(
-                            onClick = { showSpeedDialog = false },
-                            modifier = Modifier.size(16.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "Close",
-                                tint = Color.White.copy(alpha = 0.8f),
-                                modifier = Modifier.size(12.dp)
-                            )
-                        }
-                    }
+                    Slider(
+                        value = activeSpeed.coerceIn(0.25f, 4.0f),
+                        onValueChange = { playbackManager.setSpeed(it) },
+                        valueRange = 0.25f..4.0f,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = SliderDefaults.colors(
+                            thumbColor = VideonicPrimary,
+                            activeTrackColor = VideonicPrimary,
+                            inactiveTrackColor = Color.White.copy(alpha = 0.3f)
+                        )
+                    )
+                    Text(
+                        text = "${String.format(Locale.US, "%.2f", activeSpeed)}x Speed Playing",
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.align(Alignment.CenterHorizontally)
+                    )
                 }
             }
         }

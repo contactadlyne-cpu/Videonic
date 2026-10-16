@@ -403,12 +403,13 @@ fun MainApp(
                                 CurrentScreen.HOME -> {
                                     when (selectedBottomTab) {
                                         BottomNavTab.VIDEOS -> {
-                                            ScreenHomeVideos(
+                                                ScreenHomeVideos(
                                                 videos = videos,
                                                 isLoading = isLoading,
                                                 viewLayout = viewLayout,
                                                 sortOrder = sortOrder,
                                                 showThumbnails = showThumbnails,
+                                                watchHistory = recentList,
                                                 onViewLayoutChange = { libraryViewModel.setViewLayout(it) },
                                                 onSortOrderChange = { libraryViewModel.setSortOrder(it) },
                                                 onVideoClick = { video ->
@@ -418,8 +419,6 @@ fun MainApp(
                                                     selectedVideoForAction = video
                                                     showVideoActionsSheet = true
                                                 },
-                                                isFavorite = { uri -> libraryViewModel.isFavorite(uri) },
-                                                onToggleFavorite = { video -> libraryViewModel.toggleFavorite(video) },
                                                 onPickManualVideo = { videoPickerLauncher.launch(arrayOf("video/*")) },
                                                 hasLoadedOnce = hasLoadedOnce
                                             )
@@ -500,9 +499,7 @@ fun MainApp(
                                             onVideoOptionsClick = { video ->
                                                 selectedVideoForAction = video
                                                 showVideoActionsSheet = true
-                                            },
-                                            isFavorite = { uri -> libraryViewModel.isFavorite(uri) },
-                                            onToggleFavorite = { video -> libraryViewModel.toggleFavorite(video) }
+                                            }
                                         )
                                     }
                                 }
@@ -591,9 +588,7 @@ fun MainApp(
                         onVideoOptionsClick = { video ->
                             selectedVideoForAction = video
                             showVideoActionsSheet = true
-                        },
-                        isFavorite = { uri -> libraryViewModel.isFavorite(uri) },
-                        onToggleFavorite = { video -> libraryViewModel.toggleFavorite(video) }
+                        }
                     )
                 }
 

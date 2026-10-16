@@ -30,7 +30,10 @@ data class VideoTechnicalInfo(
 
 class MediaRepository(private val context: Context) {
 
-    suspend fun getDeviceVideos(): List<VideoItem> = withContext(Dispatchers.IO) {
+    private var cachedVideos: List<VideoItem>? = null
+
+    suspend fun getDeviceVideos(forceRefresh: Boolean = false): List<VideoItem> = withContext(Dispatchers.IO) {
+        if (!forceRefresh && cachedVideos != null) return@withContext cachedVideos!!
         val videos = mutableListOf<VideoItem>()
         val collection = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
@@ -127,6 +130,7 @@ class MediaRepository(private val context: Context) {
             e.printStackTrace()
         }
 
+        cachedVideos = videos
         videos
     }
 

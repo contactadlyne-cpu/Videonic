@@ -70,6 +70,7 @@ fun ScreenFolders(
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
                 .padding(32.dp),
             contentAlignment = Alignment.Center
         ) {
@@ -77,14 +78,20 @@ fun ScreenFolders(
                 Icon(
                     imageVector = Icons.Default.Folder,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-                    modifier = Modifier.size(64.dp)
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(80.dp)
                 )
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(24.dp))
                 Text(
                     text = "No video folders found",
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.onBackground
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Videos on your device will be organized into folders here.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -194,9 +201,7 @@ fun ScreenFolderDetails(
     onViewLayoutChange: (ViewLayout) -> Unit,
     onSortOrderChange: (VideoSortOrder) -> Unit,
     onVideoClick: (VideoItem) -> Unit,
-    onVideoOptionsClick: (VideoItem) -> Unit,
-    isFavorite: (String) -> Boolean,
-    onToggleFavorite: (VideoItem) -> Unit
+    onVideoOptionsClick: (VideoItem) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -237,26 +242,15 @@ fun ScreenFolderDetails(
             colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
         )
 
-        if (videos.isEmpty() && folder.videoCount > 0) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator(color = VideonicPrimary)
-            }
-        } else {
-            ScreenHomeVideos(
-                videos = videos,
-                isLoading = false,
-                viewLayout = viewLayout,
-                sortOrder = sortOrder,
-                onViewLayoutChange = onViewLayoutChange,
-                onVideoClick = onVideoClick,
-                onVideoOptionsClick = onVideoOptionsClick,
-                isFavorite = isFavorite,
-                onToggleFavorite = onToggleFavorite,
-                hasLoadedOnce = true
-            )
-        }
+        ScreenHomeVideos(
+            videos = videos,
+            isLoading = false,
+            viewLayout = viewLayout,
+            sortOrder = sortOrder,
+            onViewLayoutChange = onViewLayoutChange,
+            onVideoClick = onVideoClick,
+            onVideoOptionsClick = onVideoOptionsClick,
+            hasLoadedOnce = true
+        )
     }
 }

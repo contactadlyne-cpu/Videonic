@@ -380,6 +380,7 @@ fun selectAudioTrack(trackItem: TrackItem) {
                 ) {
                     exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters
                         .buildUpon()
+                        .setPreferredAudioLanguage(trackItem.language)
                         .setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, listOf(i)))
                         .build()
                     break

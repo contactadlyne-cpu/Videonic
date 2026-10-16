@@ -106,7 +106,7 @@ fun SheetSubtitles(
                         title = "Off",
                         subtitle = "Disable subtitles",
                         isSelected = isNoneSelected,
-                        onSelect = { playbackManager.selectSubtitleTrack(null); onDismiss() }
+                        onSelect = { playbackManager.selectSubtitleTrack(null) }
                     )
                 }
 
@@ -115,7 +115,7 @@ fun SheetSubtitles(
                         title = track.name,
                         subtitle = track.language ?: "Embedded Subtitle",
                         isSelected = track.isSelected,
-                        onSelect = { playbackManager.selectSubtitleTrack(track); onDismiss() }
+                        onSelect = { playbackManager.selectSubtitleTrack(track) }
                     )
                 }
 

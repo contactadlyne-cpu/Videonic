@@ -67,6 +67,8 @@ import com.example.ui.theme.VideonicPrimary
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import com.example.ui.theme.FavoriteRed
+import com.example.data.local.entities.WatchHistoryEntity
+import androidx.compose.material3.LinearProgressIndicator
 
 @Composable
 fun ScreenHomeVideos(
@@ -79,10 +81,9 @@ fun ScreenHomeVideos(
     onSortOrderChange: (VideoSortOrder) -> Unit = {},
     onVideoClick: (VideoItem) -> Unit,
     onVideoOptionsClick: (VideoItem) -> Unit,
-    isFavorite: (String) -> Boolean,
-    onToggleFavorite: (VideoItem) -> Unit,
     onPickManualVideo: () -> Unit = {},
-    hasLoadedOnce: Boolean = true
+    hasLoadedOnce: Boolean = true,
+    watchHistory: List<WatchHistoryEntity> = emptyList()
 ) {
     val listState = rememberLazyListState()
     val gridState = rememberLazyGridState()
@@ -183,8 +184,7 @@ fun ScreenHomeVideos(
                         VideoGridCard(
                             video = video,
                             showThumbnails = showThumbnails,
-                            isFavorite = isFavorite,
-                            onToggleFavorite = onToggleFavorite,
+                            watchHistory = watchHistory,
                             onClick = { onVideoClick(video) },
                             onOptionsClick = { onVideoOptionsClick(video) }
                         )
@@ -203,8 +203,7 @@ fun ScreenHomeVideos(
                         VideoListRow(
                             video = video,
                             showThumbnails = showThumbnails,
-                            isFavorite = isFavorite,
-                            onToggleFavorite = onToggleFavorite,
+                            watchHistory = watchHistory,
                             onClick = { onVideoClick(video) },
                             onOptionsClick = { onVideoOptionsClick(video) }
                         )
@@ -219,8 +218,7 @@ fun ScreenHomeVideos(
 fun VideoGridCard(
     video: VideoItem,
     showThumbnails: Boolean = true,
-    isFavorite: (String) -> Boolean,
-    onToggleFavorite: (VideoItem) -> Unit,
+    watchHistory: List<WatchHistoryEntity> = emptyList(),
     onClick: () -> Unit,
     onOptionsClick: () -> Unit
 ) {
@@ -245,13 +243,29 @@ fun VideoGridCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column {
-            VideoThumbnail(
-                video = video,
-                showThumbnailImage = showThumbnails,
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(110.dp)
-            )
+            ) {
+                VideoThumbnail(
+                    video = video,
+                    showThumbnailImage = showThumbnails,
+                    modifier = Modifier.fillMaxSize()
+                )
+                val historyItem = watchHistory.find { it.uriString == video.uri.toString() }
+                if (historyItem != null && historyItem.progressFraction > 0f) {
+                    LinearProgressIndicator(
+                        progress = { historyItem.progressFraction },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(4.dp)
+                            .align(Alignment.BottomCenter),
+                        color = VideonicPrimary,
+                        trackColor = Color.Black.copy(alpha = 0.35f)
+                    )
+                }
+            }
 
             Row(
                 modifier = Modifier
@@ -297,19 +311,6 @@ fun VideoGridCard(
                 }
 
                 IconButton(
-                    onClick = { onToggleFavorite(video) },
-                    modifier = Modifier
-                        .size(28.dp)
-                        .testTag("video_card_favorite_${video.id}")
-                ) {
-                    Icon(
-                        imageVector = if (isFavorite(video.uri.toString())) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                        contentDescription = "Toggle Favorite",
-                        tint = if (isFavorite(video.uri.toString())) FavoriteRed else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-                IconButton(
                     onClick = onOptionsClick,
                     modifier = Modifier
                         .size(28.dp)
@@ -331,8 +332,7 @@ fun VideoGridCard(
 fun VideoListRow(
     video: VideoItem,
     showThumbnails: Boolean = true,
-    isFavorite: (String) -> Boolean,
-    onToggleFavorite: (VideoItem) -> Unit,
+    watchHistory: List<WatchHistoryEntity> = emptyList(),
     onClick: () -> Unit,
     onOptionsClick: () -> Unit
 ) {
@@ -356,93 +356,86 @@ fun VideoListRow(
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            VideoThumbnail(
-                video = video,
-                showThumbnailImage = showThumbnails,
+        Column {
+            Row(
                 modifier = Modifier
-                    .size(width = 90.dp, height = 62.dp)
-            )
-
-            Spacer(modifier = Modifier.width(12.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = video.displayName,
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 14.sp
-                    ),
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = video.formattedSize,
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    .fillMaxWidth()
+                    .padding(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(width = 90.dp, height = 62.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                ) {
+                    VideoThumbnail(
+                        video = video,
+                        showThumbnailImage = showThumbnails,
+                        modifier = Modifier.fillMaxSize()
                     )
+                    val historyItem = watchHistory.find { it.uriString == video.uri.toString() }
+                    if (historyItem != null && historyItem.progressFraction > 0f) {
+                        LinearProgressIndicator(
+                            progress = { historyItem.progressFraction },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(4.dp)
+                                .align(Alignment.BottomCenter),
+                            color = VideonicPrimary,
+                            trackColor = Color.Black.copy(alpha = 0.35f)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = " • ",
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = video.displayName,
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 14.sp
+                        ),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
-                    Text(
-                        text = video.resolutionLabel,
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Medium
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = video.formattedSize,
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = " • ",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = video.resolutionLabel,
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+
+                IconButton(
+                    onClick = onOptionsClick,
+                    modifier = Modifier
+                        .size(36.dp)
+                        .testTag("video_row_options_${video.id}")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.MoreVert,
+                        contentDescription = "Options",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
-            }
-
-            IconButton(
-                onClick = { onToggleFavorite(video) },
-                modifier = Modifier
-                    .size(36.dp)
-                    .testTag("video_row_favorite_${video.id}")
-            ) {
-                Icon(
-                    imageVector = if (isFavorite(video.uri.toString())) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                    contentDescription = "Toggle Favorite",
-                    tint = if (isFavorite(video.uri.toString())) FavoriteRed else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-            IconButton(
-                onClick = { onToggleFavorite(video) },
-                modifier = Modifier
-                    .size(36.dp)
-                    .testTag("video_row_favorite_${video.id}")
-            ) {
-                Icon(
-                    imageVector = if (isFavorite(video.uri.toString())) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                    contentDescription = "Toggle Favorite",
-                    tint = if (isFavorite(video.uri.toString())) FavoriteRed else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-            IconButton(
-                onClick = onOptionsClick,
-                modifier = Modifier
-                    .size(36.dp)
-                    .testTag("video_row_options_${video.id}")
-            ) {
-                Icon(
-                    imageVector = Icons.Default.MoreVert,
-                    contentDescription = "Options",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp)
-                )
             }
         }
     }

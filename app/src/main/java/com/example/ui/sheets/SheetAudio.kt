@@ -97,7 +97,7 @@ fun SheetAudio(
                             title = track.name,
                             subtitle = track.language ?: "Default",
                             isSelected = track.isSelected,
-                            onSelect = { playbackManager.selectAudioTrack(track); onDismiss() }
+                            onSelect = { playbackManager.selectAudioTrack(track) }
                         )
                     }
                 }
