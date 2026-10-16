@@ -72,6 +72,7 @@ import com.example.ui.components.VideonicTopBar
 import com.example.ui.dialogs.DialogAddToPlaylist
 import com.example.ui.dialogs.DialogDecoderSelector
 import com.example.ui.dialogs.DialogEqualizer
+import com.example.ui.dialogs.DialogNetworkStream
 import com.example.ui.dialogs.DialogRename
 import com.example.ui.dialogs.DialogSleepTimer
 import com.example.ui.dialogs.DialogThemeSelection
@@ -215,6 +216,7 @@ fun MainApp(
     var showEqualizerDialog by remember { mutableStateOf(false) }
     var showDecoderDialog by remember { mutableStateOf(false) }
     var showQualityDialog by remember { mutableStateOf(false) }
+    var showNetworkStreamDialog by remember { mutableStateOf(false) }
     var showRenameDialog by remember { mutableStateOf(false) }
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
     var videoToDelete by remember { mutableStateOf<VideoItem?>(null) }
@@ -493,7 +495,15 @@ fun MainApp(
                                                 onOpenSettings = { currentScreen = CurrentScreen.SETTINGS },
                                                 onOpenThemeDialog = { showThemeDialog = true },
                                                 onOpenAbout = { currentScreen = CurrentScreen.ABOUT },
-                                                onOpenReport = { currentScreen = CurrentScreen.REPORT }
+                                                onOpenReport = { currentScreen = CurrentScreen.REPORT },
+                                                onOpenNetworkStream = { showNetworkStreamDialog = true },
+                                                onDeleteVideos = { toDelete ->
+                                                    toDelete.forEach { libraryViewModel.moveToRecycleBin(it) }
+                                                    Toast.makeText(context, "Moved ${toDelete.size} videos to Recycle Bin", Toast.LENGTH_SHORT).show()
+                                                },
+                                                onPlayVideo = { video ->
+                                                    launchVideoWithResumeCheck(video, allVideosList)
+                                                }
                                             )
                                         }
                                     }
@@ -996,6 +1006,16 @@ fun MainApp(
                     qualityTracks = qualityTracks,
                     onDismiss = { showQualityDialog = false },
                     onSelectQuality = { track -> playbackManager.selectVideoQualityTrack(track) }
+                )
+            }
+
+            if (showNetworkStreamDialog) {
+                DialogNetworkStream(
+                    onDismiss = { showNetworkStreamDialog = false },
+                    onPlayStream = { url, title ->
+                        playbackManager.playUri(Uri.parse(url), title)
+                        currentScreen = CurrentScreen.PLAYER
+                    }
                 )
             }
         }

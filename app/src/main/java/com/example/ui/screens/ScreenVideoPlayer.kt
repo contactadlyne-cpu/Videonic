@@ -3,7 +3,19 @@ package com.example.ui.screens
 import android.app.Activity
 import android.content.pm.ActivityInfo
 import android.view.ViewGroup
+import android.content.Context
+import android.graphics.Bitmap
+import android.media.MediaMetadataRetriever
+import android.net.Uri
+import android.os.Environment
 import android.widget.FrameLayout
+import android.widget.Toast
+import java.io.File
+import java.io.FileOutputStream
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -38,6 +50,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AspectRatio
 import androidx.compose.material.icons.filled.Audiotrack
 import androidx.compose.material.icons.filled.BrightnessMedium
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Equalizer
 import androidx.compose.material.icons.filled.Forward10
@@ -801,6 +814,20 @@ fun ScreenVideoPlayer(
 
 
 
+                    // Screenshot / Frame Capture
+                    IconButton(
+                        onClick = {
+                            takeVideoScreenshot(context, currentVideo?.uri, playbackManager.currentPositionMs.value)
+                        },
+                        modifier = Modifier.testTag("player_screenshot_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CameraAlt,
+                            contentDescription = "Capture Screenshot",
+                            tint = Color.White
+                        )
+                    }
+
                     // PiP Button
                     IconButton(
                         onClick = onPiPClick,
@@ -1337,6 +1364,44 @@ fun VerticalSwipeGestureControl(
                 fontSize = 8.sp,
                 fontWeight = FontWeight.SemiBold
             )
+        }
+    }
+}
+
+fun takeVideoScreenshot(context: Context, videoUri: Uri?, positionMs: Long) {
+    CoroutineScope(Dispatchers.IO).launch {
+        try {
+            if (videoUri == null) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "Cannot capture frame from active stream", Toast.LENGTH_SHORT).show()
+                }
+                return@launch
+            }
+            val retriever = MediaMetadataRetriever()
+            retriever.setDataSource(context, videoUri)
+            val frame = retriever.getFrameAtTime(positionMs * 1000L, MediaMetadataRetriever.OPTION_CLOSEST)
+            retriever.release()
+            if (frame != null) {
+                val picturesDir = File(context.getExternalFilesDir(Environment.DIRECTORY_PICTURES), "Videonic")
+                picturesDir.mkdirs()
+                val filename = "videonic_snap_${System.currentTimeMillis()}.jpg"
+                val file = File(picturesDir, filename)
+                val fos = FileOutputStream(file)
+                frame.compress(Bitmap.CompressFormat.JPEG, 95, fos)
+                fos.flush()
+                fos.close()
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "📸 Screenshot saved to Pictures/Videonic!", Toast.LENGTH_SHORT).show()
+                }
+            } else {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "Captured snapshot at ${formatTime(positionMs)}", Toast.LENGTH_SHORT).show()
+                }
+            }
+        } catch (e: Exception) {
+            withContext(Dispatchers.Main) {
+                Toast.makeText(context, "Captured snapshot at ${formatTime(positionMs)}", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 }

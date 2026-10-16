@@ -17,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.AspectRatio
 import androidx.compose.material.icons.filled.Audiotrack
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Equalizer
 import androidx.compose.material.icons.filled.Headphones
@@ -43,6 +44,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -207,6 +209,19 @@ fun SheetPlayerOptions(
                         !isAbActive -> playbackManager.setRepeatPointB()
                         else -> playbackManager.clearAbRepeat()
                     }
+                }
+            )
+
+            // Screenshot
+            val context = LocalContext.current
+            OptionRowItem(
+                icon = Icons.Default.CameraAlt,
+                title = "Take screenshot",
+                value = "",
+                onClick = {
+                    val curVid = playbackManager.currentVideo.value
+                    com.example.ui.screens.takeVideoScreenshot(context, curVid?.uri, playbackManager.currentPositionMs.value)
+                    onDismiss()
                 }
             )
 

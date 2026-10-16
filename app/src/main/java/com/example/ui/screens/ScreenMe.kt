@@ -24,11 +24,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Feedback
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PlaylistPlay
@@ -43,7 +45,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import com.example.ui.dialogs.DialogStorageCleaner
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -72,8 +77,12 @@ fun ScreenMe(
     onOpenSettings: () -> Unit,
     onOpenThemeDialog: () -> Unit,
     onOpenAbout: () -> Unit,
-    onOpenReport: () -> Unit
+    onOpenReport: () -> Unit,
+    onOpenNetworkStream: () -> Unit = {},
+    onDeleteVideos: (List<VideoItem>) -> Unit = {},
+    onPlayVideo: (VideoItem) -> Unit = {}
 ) {
+    var showStorageCleanerDialog by remember { mutableStateOf(false) }
     val totalSizeBytes = videos.sumOf { it.sizeBytes }
     val formattedVideoSize = formatBytes(totalSizeBytes)
 
@@ -154,7 +163,8 @@ fun ScreenMe(
                     MeStatColumn(
                         icon = Icons.Default.Storage,
                         value = storageDisplayText,
-                        label = "Storage Used"
+                        label = "Storage Used",
+                        onClick = { showStorageCleanerDialog = true }
                     )
                     MeStatColumn(
                         icon = Icons.Default.Favorite,
@@ -242,7 +252,36 @@ fun ScreenMe(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // Group 3: Support & About (Clean, unified, non-duplicated)
+        // Group 3: Tools & Storage
+        MeSectionTitle("Tools & Network")
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        ) {
+            Column {
+                MeNavRow(
+                    icon = Icons.Default.Language,
+                    iconTint = VideonicPrimary,
+                    title = "Network Stream",
+                    badge = "Play URL / HLS",
+                    onClick = onOpenNetworkStream
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                MeNavRow(
+                    icon = Icons.Default.CleaningServices,
+                    iconTint = VideonicPrimary,
+                    title = "Storage Cleaner & Duplicates",
+                    badge = "Analyze & Clean",
+                    onClick = { showStorageCleanerDialog = true }
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // Group 4: Support & About
         MeSectionTitle("Support & About")
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -270,6 +309,20 @@ fun ScreenMe(
         }
 
         Spacer(modifier = Modifier.height(28.dp))
+    }
+
+    if (showStorageCleanerDialog) {
+        DialogStorageCleaner(
+            videos = videos,
+            totalDeviceStorageBytes = totalDeviceStorageBytes,
+            onDismiss = { showStorageCleanerDialog = false },
+            onDeleteVideos = { toDelete ->
+                onDeleteVideos(toDelete)
+            },
+            onPlayVideo = { vid ->
+                onPlayVideo(vid)
+            }
+        )
     }
 }
 
