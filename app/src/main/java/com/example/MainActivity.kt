@@ -231,7 +231,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onPause() {
         super.onPause()
-        playbackManager.onPause(isFinishing, _isInPipMode.value)
+        if (!playbackManager.isBackgroundAudioEnabled.value) {
+            playbackManager.onPause(isFinishing, _isInPipMode.value)
+        }
     }
 
     override fun onDestroy() {

@@ -532,15 +532,23 @@ fun ScreenVideoPlayer(
                         )
                     }
 
-                    // Audio Track Toggle
+                    // Background Audio Toggle via Music Note Icon
+                    val isBgAudioOn by playbackManager.isBackgroundAudioEnabled.collectAsState()
                     IconButton(
-                        onClick = onAudioSubClick,
+                        onClick = {
+                            val enabled = playbackManager.toggleBackgroundAudio()
+                            android.widget.Toast.makeText(
+                                context,
+                                if (enabled) "Background Audio Playback Enabled" else "Background Audio Playback Disabled",
+                                android.widget.Toast.LENGTH_SHORT
+                            ).show()
+                        },
                         modifier = Modifier.testTag("player_audio_button")
                     ) {
                         Icon(
                             imageVector = Icons.Default.Audiotrack,
-                            contentDescription = "Audio Track",
-                            tint = Color.White
+                            contentDescription = "Background Audio Toggle",
+                            tint = if (isBgAudioOn) com.example.ui.theme.VideonicPrimary else Color.White
                         )
                     }
 
