@@ -344,7 +344,7 @@ fun MainApp(
                                     BottomNavTab.VIDEOS -> "Videonic Lite"
                                     BottomNavTab.FOLDERS -> "Folders"
                                     BottomNavTab.RECENT -> "Recent"
-                                    BottomNavTab.ME -> "Me"
+                                    BottomNavTab.ME -> ""
                                 }
                             }
                             VideonicTopBar(
@@ -473,6 +473,37 @@ fun MainApp(
                                     }
                                 }
 
+                                CurrentScreen.FOLDER_DETAILS -> {
+                                    val selectedFolder by libraryViewModel.selectedFolder.collectAsState()
+                                    val folderVideos by libraryViewModel.folderVideos.collectAsState()
+                                    val viewLayout by libraryViewModel.viewLayout.collectAsState()
+                                    val sortOrder by libraryViewModel.sortOrder.collectAsState()
+
+                                    if (selectedFolder != null) {
+                                        ScreenFolderDetails(
+                                            folder = selectedFolder!!,
+                                            videos = folderVideos,
+                                            viewLayout = viewLayout,
+                                            sortOrder = sortOrder,
+                                            onBackClick = { currentScreen = CurrentScreen.HOME },
+                                            onViewLayoutChange = { libraryViewModel.setViewLayout(it) },
+                                            onSortOrderChange = { libraryViewModel.setSortOrder(it) },
+                                            onVideoClick = { video ->
+                                                val savedPos = libraryViewModel.getWatchPosition(video.uri.toString())
+                                                val shouldResume = resumePlayback && savedPos > 3000L && (video.durationMs <= 0 || savedPos < video.durationMs - 5000L)
+                                                val startPos = if (shouldResume) savedPos else 0L
+                                                playbackManager.playVideo(video, startPos, folderVideos)
+                                                currentScreen = CurrentScreen.PLAYER
+                                            },
+                                            onVideoOptionsClick = { video ->
+                                                selectedVideoForAction = video
+                                                showVideoActionsSheet = true
+                                            },
+                                            isFavorite = { uri -> libraryViewModel.isFavorite(uri) },
+                                            onToggleFavorite = { video -> libraryViewModel.toggleFavorite(video) }
+                                        )
+                                    }
+                                }
                                 CurrentScreen.FAVORITES -> {
                                     ScreenFavorites(
                                         favorites = favoritesList,
@@ -534,38 +565,6 @@ fun MainApp(
                     }
                 }
 
-                CurrentScreen.FOLDER_DETAILS -> {
-                    BackHandler { currentScreen = CurrentScreen.HOME }
-                    val selectedFolder by libraryViewModel.selectedFolder.collectAsState()
-                    val folderVideos by libraryViewModel.folderVideos.collectAsState()
-                    val viewLayout by libraryViewModel.viewLayout.collectAsState()
-                    val sortOrder by libraryViewModel.sortOrder.collectAsState()
-
-                    if (selectedFolder != null) {
-                        ScreenFolderDetails(
-                            folder = selectedFolder!!,
-                            videos = folderVideos,
-                            viewLayout = viewLayout,
-                            sortOrder = sortOrder,
-                            onBackClick = { currentScreen = CurrentScreen.HOME },
-                            onViewLayoutChange = { libraryViewModel.setViewLayout(it) },
-                            onSortOrderChange = { libraryViewModel.setSortOrder(it) },
-                            onVideoClick = { video ->
-                                val savedPos = libraryViewModel.getWatchPosition(video.uri.toString())
-                                val shouldResume = resumePlayback && savedPos > 3000L && (video.durationMs <= 0 || savedPos < video.durationMs - 5000L)
-                                val startPos = if (shouldResume) savedPos else 0L
-                                playbackManager.playVideo(video, startPos, folderVideos)
-                                currentScreen = CurrentScreen.PLAYER
-                            },
-                            onVideoOptionsClick = { video ->
-                                selectedVideoForAction = video
-                                showVideoActionsSheet = true
-                            },
-                            isFavorite = { uri -> libraryViewModel.isFavorite(uri) },
-                            onToggleFavorite = { video -> libraryViewModel.toggleFavorite(video) }
-                        )
-                    }
-                }
 
                 CurrentScreen.SEARCH -> {
                     BackHandler { currentScreen = CurrentScreen.HOME }

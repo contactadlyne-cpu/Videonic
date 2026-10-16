@@ -310,19 +310,6 @@ fun VideoGridCard(
                     )
                 }
                 IconButton(
-                    onClick = { onToggleFavorite(video) },
-                    modifier = Modifier
-                        .size(28.dp)
-                        .testTag("video_card_favorite_${video.id}")
-                ) {
-                    Icon(
-                        imageVector = if (isFavorite(video.uri.toString())) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                        contentDescription = "Toggle Favorite",
-                        tint = if (isFavorite(video.uri.toString())) FavoriteRed else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-                IconButton(
                     onClick = onOptionsClick,
                     modifier = Modifier
                         .size(28.dp)
